@@ -1,8 +1,3 @@
-"""
-Flask application for performing OCR on scanned Old Nepali documents.
-2-page layout: Page 1 = Upload + Preprocessing, Page 2 = Run OCR
-"""
-
 import io
 import os
 import re
@@ -486,16 +481,57 @@ def _run_ocr_on_image(pil_img, xml_bytes=None, progress_queue=None):
         except Exception:
             boxes = []
 
-    total = len(boxes) if boxes else 1
-    concatenated_parts = []
+    all_dfs = []
+    all_texts = []
+    all_html_lines = []
 
     if boxes:
+        total = len(boxes)
         for idx, b in enumerate(boxes, 1):
             if progress_queue:
                 progress_queue.put(('progress', idx, total, f"Line {idx} of {total}"))
-            # ... rest of loop unchanged
+            x1, y1, x2, y2 = b["bbox"]
+            pad = 4
+            crop = pil_img.crop((
+                max(0, x1 - pad), max(0, y1 - pad),
+                min(pil_img.width, x2 + pad), min(pil_img.height, y2 + pad)
+            ))
+            try:
+                text, df = predict_and_score_once(crop, line_id=idx)
+            except Exception as e:
+                text, df = f"[error: {e}]", pd.DataFrame()
+            all_texts.append(text)
+            all_dfs.append(df)
+            if not df.empty:
+                html_line = highlight_tokens_with_tooltips(text, df, REL_PROB_TH, "cal_confidence")
+            else:
+                html_line = _html_escape(text)
+            all_html_lines.append(f'<div class="ocr-line">{html_line}</div>')
+    else:
+        # No XML — run OCR on the full image as a single region
+        if progress_queue:
+            progress_queue.put(('progress', 1, 1, "Processing full image"))
+        try:
+            text, df = predict_and_score_once(pil_img, line_id=1)
+        except Exception as e:
+            text, df = f"[error: {e}]", pd.DataFrame()
+        all_texts.append(text)
+        all_dfs.append(df)
+        if not df.empty:
+            html_line = highlight_tokens_with_tooltips(text, df, REL_PROB_TH, "cal_confidence")
+        else:
+            html_line = _html_escape(text)
+        all_html_lines.append(f'<div class="ocr-line">{html_line}</div>')
+
+    overlay_img = draw_boxes(pil_img, boxes) if boxes else pil_img.copy()
+    predicted_html = "\n".join(all_html_lines)
+    plain_text = "\n".join(all_texts)
+
+    return overlay_img, predicted_html, plain_text
+
+
 # ----------------------------------------------------------------------
-# HTML
+# HTML template — clean academic design
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
@@ -504,186 +540,615 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HTR — Old Nepali Manuscripts</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; }
-  header { background: #1a1a1a; color: #f5f4f0; padding: 20px 40px; display: flex; align-items: baseline; gap: 16px; }
-  header h1 { font-size: 20px; font-weight: 600; }
-  header span { font-size: 13px; opacity: 0.5; }
-  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
-  .tabs { display: flex; margin-bottom: 32px; border-bottom: 2px solid #1a1a1a; }
-  .tab-btn { padding: 10px 24px; font-size: 14px; font-weight: 500; background: none; border: none; cursor: pointer; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; }
-  .tab-btn.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f7f6f2;
+    --surface:   #ffffff;
+    --surface-2: #f2f1ed;
+    --border:    rgba(0,0,0,0.10);
+    --border-md: rgba(0,0,0,0.18);
+    --text-1:    #111111;
+    --text-2:    #555555;
+    --text-3:    #999999;
+    --accent:    #111111;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text-1);
+    min-height: 100vh;
+  }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    height: 52px;
+  }
+  .topbar-brand { display: flex; align-items: baseline; gap: 10px; }
+  .topbar-brand h1 { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+  .topbar-brand span { font-size: 12px; color: var(--text-3); }
+
+  /* ---- Step indicator ---- */
+  .steps { display: flex; align-items: center; gap: 0; }
+  .step {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 16px; height: 52px;
+    font-size: 13px; color: var(--text-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+  }
+  .step:hover { color: var(--text-2); }
+  .step.active { color: var(--text-1); border-bottom-color: var(--text-1); }
+  .step.done { color: var(--text-2); }
+  .step-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 0.5px solid var(--border-md);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 500; flex-shrink: 0;
+  }
+  .step.active .step-num { background: var(--text-1); color: #fff; border-color: var(--text-1); }
+  .step.done .step-num { background: #e6f4ec; color: #2a7a4b; border-color: #c0dece; }
+  .step-divider { width: 20px; height: 0.5px; background: var(--border); flex-shrink: 0; }
+
+  /* ---- Layout ---- */
+  .content { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .image-sidebar {
+    position: sticky;
+    top: 72px;
+  }
+  .sidebar-preview {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface-2);
+    min-height: 220px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  .sidebar-preview img { width: 100%; object-fit: contain; display: block; }
+  .sidebar-placeholder { font-size: 12px; color: var(--text-3); padding: 32px 16px; text-align: center; line-height: 1.6; }
+  .sidebar-label { font-size: 11px; color: var(--text-3); padding: 6px 10px; background: var(--surface-2); border-top: 0.5px solid var(--border); text-align: center; width: 100%; }
+
+  .tab-col { min-width: 0; }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
-  .card { background: #fff; border: 1px solid #e0ddd6; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
-  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #333; }
-  .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .upload-box { border: 2px dashed #ccc; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; position: relative; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .upload-box:hover { border-color: #888; }
-  .upload-box input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .upload-box .icon { font-size: 28px; margin-bottom: 8px; }
-  .upload-box .label { font-size: 13px; color: #666; }
-  .upload-box .filename { font-size: 12px; color: #1a1a1a; margin-top: 6px; font-weight: 500; }
-  #image-preview { max-width: 100%; max-height: 200px; margin-top: 10px; border-radius: 6px; display: none; }
-  .method-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-  .method-check { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid #e0ddd6; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  .method-check:hover { background: #f5f4f0; }
-  .method-check input { accent-color: #1a1a1a; width: 15px; height: 15px; cursor: pointer; }
-  .param-panel { display: none; padding: 14px; background: #f9f8f5; border-radius: 8px; margin-bottom: 12px; }
-  .param-panel.visible { display: block; }
-  .param-panel h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #444; }
-  .param-row { display: grid; grid-template-columns: 160px 1fr 48px; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .param-row label { font-size: 12px; color: #555; }
-  .param-row input[type=range] { accent-color: #1a1a1a; }
-  .param-row span { font-size: 12px; color: #333; text-align: right; }
-  #preprocessed-preview { max-width: 100%; max-height: 280px; border-radius: 8px; display: none; margin-top: 8px; }
-  .btn { padding: 11px 24px; font-size: 14px; font-weight: 500; border: none; border-radius: 7px; cursor: pointer; }
-  .btn:hover { opacity: 0.85; }
-  .btn-primary { background: #1a1a1a; color: #fff; }
-  .btn-secondary { background: #e0ddd6; color: #1a1a1a; }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .ocr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  #overlay-img { max-width: 100%; border-radius: 8px; }
-  #prediction-box { border: 1px solid #e0ddd6; padding: 16px; border-radius: 8px; background: #faf9f7; font-size: 18px; line-height: 1.8; min-height: 120px; }
-  .ocr-token { cursor: help; position: relative; display: inline; text-decoration: underline; text-decoration-thickness: 2px; }
-  .conf-red    { text-decoration-color: rgba(220,38,38,0.9); }
-  .conf-orange { text-decoration-color: rgba(249,115,22,0.9); }
-  .conf-yellow { text-decoration-color: rgba(234,179,8,0.9); }
-  .conf-green  { text-decoration-color: rgba(34,197,94,0.9); }
-  .ocr-token::after { content: attr(data-tooltip); white-space: pre-line; position: absolute; left: 0; bottom: 120%; background: #222; color: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.4; min-width: 180px; max-width: 320px; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text-3); margin-bottom: 12px;
+  }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin-bottom: 14px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-3); margin-bottom: 16px;
+  }
+  .card-header svg { flex-shrink: 0; }
+
+  /* ---- Upload zones ---- */
+  .upload-zone {
+    border: 0.5px dashed var(--border-md);
+    border-radius: var(--radius-md);
+    padding: 22px 16px; text-align: center;
+    cursor: pointer; position: relative;
+    background: var(--surface-2);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .upload-zone:hover { border-color: var(--text-2); background: #eceae4; }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .uz-icon { font-size: 20px; color: var(--text-3); }
+  .uz-label { font-size: 13px; color: var(--text-2); }
+  .uz-sub { font-size: 11px; color: var(--text-3); }
+  .uz-filename { font-size: 12px; font-weight: 500; color: var(--text-1); margin-top: 2px; }
+
+  /* ---- Method checkboxes ---- */
+  .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }
+  .method-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border: 0.5px solid var(--border);
+    border-radius: var(--radius-md); font-size: 13px; cursor: pointer;
+  }
+  .method-row:hover { background: var(--surface-2); }
+  .method-row input[type=checkbox] { accent-color: var(--text-1); cursor: pointer; width: 14px; height: 14px; }
+  .method-note { font-size: 11px; color: var(--text-3); margin-top: 10px; line-height: 1.6; }
+
+  /* ---- Parameter panels ---- */
+  .param-group {
+    background: var(--surface-2); border-radius: var(--radius-md);
+    padding: 14px 16px; margin-top: 10px; display: none;
+  }
+  .param-group.visible { display: block; }
+  .param-group-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--text-3); margin-bottom: 12px;
+  }
+  .param-row {
+    display: grid; grid-template-columns: 160px 1fr 48px;
+    align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .param-row:last-child { margin-bottom: 0; }
+  .param-row label { font-size: 12px; color: var(--text-2); }
+  .param-row input[type=range] { accent-color: var(--text-1); }
+  .param-row .val { font-size: 12px; color: var(--text-1); text-align: right; }
+
+  /* ---- Preview image ---- */
+  .preview-frame {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden; margin-top: 14px;
+  }
+  .preview-frame img {
+    width: 100%; max-height: 260px; object-fit: contain;
+    background: var(--surface-2); display: none; display: block;
+  }
+  .preview-placeholder {
+    height: 160px; background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .preview-placeholder span { font-size: 12px; color: var(--text-3); }
+  .preview-label {
+    font-size: 11px; color: var(--text-3); padding: 6px 12px;
+    background: var(--surface-2); border-top: 0.5px solid var(--border);
+  }
+
+  /* ---- Buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    border-radius: var(--radius-md); cursor: pointer;
+    border: 0.5px solid var(--border-md);
+    background: var(--surface); color: var(--text-1);
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn:active { opacity: 0.8; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--text-1); color: #fff; border-color: var(--text-1);
+  }
+  .btn-primary:hover { opacity: 0.85; background: var(--text-1); }
+
+  .action-bar { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+  .status-text { font-size: 12px; color: var(--text-3); }
+  .status-error { font-size: 12px; color: #c0392b; }
+
+  /* ---- Progress ---- */
+  .progress-wrap { margin-top: 14px; }
+  .progress-track {
+    height: 3px; background: var(--surface-2);
+    border-radius: 2px; overflow: hidden;
+    border: 0.5px solid var(--border);
+  }
+  .progress-bar { height: 100%; width: 0%; background: var(--text-1); border-radius: 2px; transition: width 0.3s; }
+  .progress-meta { display: flex; justify-content: space-between; margin-top: 6px; }
+  .progress-meta span { font-size: 11px; color: var(--text-3); }
+
+  /* ---- Results ---- */
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #overlay-img { width: 100%; border-radius: var(--radius-md); border: 0.5px solid var(--border); }
+
+  .legend-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ---- Prediction box ---- */
+  #prediction-box {
+    font-size: 18px; line-height: 2.0;
+    min-height: 100px; padding: 4px 0;
+    color: var(--text-1);
+  }
+  .ocr-token {
+    cursor: help; position: relative;
+    text-decoration: underline; text-decoration-thickness: 2px;
+  }
+  .conf-red    { text-decoration-color: rgba(192, 57, 43, 0.85); }
+  .conf-orange { text-decoration-color: rgba(211, 84, 0, 0.85); }
+  .conf-yellow { text-decoration-color: rgba(183, 149, 11, 0.85); }
+  .conf-green  { text-decoration-color: rgba(39, 174, 96, 0.85); }
+  .ocr-token::after {
+    content: attr(data-tooltip);
+    white-space: pre-line;
+    position: absolute; left: 0; bottom: 120%;
+    background: #1a1a1a; color: #f5f5f5;
+    padding: 8px 10px; border-radius: 6px;
+    font-size: 12px; line-height: 1.5;
+    min-width: 180px; max-width: 300px;
+    z-index: 1000; opacity: 0; pointer-events: none;
+    transition: opacity 0.15s;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
   .ocr-token:hover::after { opacity: 1; }
-  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 2px; }
-  textarea#edited-text { width: 100%; min-height: 120px; font-size: 15px; padding: 12px; border: 1px solid #e0ddd6; border-radius: 8px; resize: vertical; font-family: inherit; background: #faf9f7; }
-  .status { font-size: 13px; color: #666; margin-top: 8px; min-height: 20px; }
-  .status.error { color: #dc2626; }
-  .spinner { display: none; width: 18px; height: 18px; border: 2px solid #ccc; border-top-color: #1a1a1a; border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 10px; vertical-align: middle; }
+
+  /* ---- Edit textarea ---- */
+  #edited-text {
+    width: 100%; min-height: 100px; font-size: 14px;
+    padding: 12px; border: 0.5px solid var(--border);
+    border-radius: var(--radius-md); resize: vertical;
+    font-family: inherit; background: var(--surface-2);
+    color: var(--text-1); line-height: 1.7;
+  }
+  #edited-text:focus { outline: none; border-color: var(--border-md); }
+
+  /* ---- Spinner ---- */
+  .spinner {
+    display: none; width: 14px; height: 14px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- Lightbox ---- */
+  .sidebar-preview img { cursor: zoom-in; }
+  #lightbox {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.85);
+    align-items: center; justify-content: center;
+    cursor: zoom-out;
+    animation: lb-in 0.18s ease;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img {
+    max-width: 90vw; max-height: 90vh;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 48px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  #lightbox-close {
+    position: fixed; top: 20px; right: 24px;
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.12);
+    border: 0.5px solid rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #fff; font-size: 16px;
+  }
+  #lightbox-close:hover { background: rgba(255,255,255,0.22); }
+  @keyframes lb-in { from { opacity: 0; } to { opacity: 1; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Handwritten Text Recognition</h1>
-  <span>Old Nepali Manuscripts</span>
-</header>
-<div class="container">
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab(0)">📄 Step 1 — Upload & Preprocess</button>
-    <button class="tab-btn" onclick="switchTab(1)">🔍 Step 2 — Run OCR</button>
-  </div>
 
-  <!-- PAGE 1 -->
-  <div class="tab-panel active" id="tab-0">
-    <div class="card">
-      <h2>Upload files</h2>
-      <div class="upload-row">
-        <div class="upload-box">
-          <input type="file" id="image-file" accept="image/*" onchange="onImageChange(this)">
-          <div class="icon">🖼</div>
-          <div class="label">Click to upload manuscript image<br><small>JPG, PNG</small></div>
-          <div class="filename" id="img-filename"></div>
-        </div>
-        <div class="upload-box">
-          <input type="file" id="xml-file" accept=".xml" onchange="onXmlChange(this)">
-          <div class="icon">📎</div>
-          <div class="label">Segmentation XML (optional)<br><small>.xml from eScriptorium</small></div>
-          <div class="filename" id="xml-filename"></div>
-        </div>
-      </div>
-      <img id="image-preview">
-    </div>
-
-    <div class="card">
-      <h2>Preprocessing</h2>
-      <div class="method-grid">
-        <label class="method-check"><input type="checkbox" value="sauvola" onchange="togglePanel('sauvola-panel', this); triggerPreview()"> Sauvola binarization</label>
-        <label class="method-check"><input type="checkbox" value="clahe" onchange="togglePanel('clahe-panel', this); triggerPreview()"> CLAHE lighting fix</label>
-        <label class="method-check"><input type="checkbox" value="gaussian" onchange="togglePanel('gaussian-panel', this); triggerPreview()"> Gaussian normalization</label>
-        <label class="method-check"><input type="checkbox" value="morph" onchange="togglePanel('morph-panel', this); triggerPreview()"> Morphological opening</label>
-      </div>
-
-      <div class="param-panel" id="sauvola-panel">
-        <h3>Sauvola parameters</h3>
-        <div class="param-row"><label>Window size</label><input type="range" id="sauvola-window" min="11" max="101" step="2" value="35" oninput="updateVal('sauvola-window-val', this.value); triggerPreview()"><span id="sauvola-window-val">35</span></div>
-        <div class="param-row"><label>k (sensitivity)</label><input type="range" id="sauvola-k" min="0.05" max="0.5" step="0.01" value="0.2" oninput="updateVal('sauvola-k-val', this.value); triggerPreview()"><span id="sauvola-k-val">0.2</span></div>
-      </div>
-      <div class="param-panel" id="clahe-panel">
-        <h3>CLAHE parameters</h3>
-        <div class="param-row"><label>Clip limit</label><input type="range" id="clahe-clip" min="1" max="80" step="0.5" value="30" oninput="updateVal('clahe-clip-val', this.value); triggerPreview()"><span id="clahe-clip-val">30</span></div>
-        <div class="param-row"><label>Tile grid size</label><input type="range" id="clahe-tile" min="2" max="16" step="1" value="4" oninput="updateVal('clahe-tile-val', this.value); triggerPreview()"><span id="clahe-tile-val">4</span></div>
-      </div>
-      <div class="param-panel" id="gaussian-panel">
-        <h3>Gaussian normalization parameters</h3>
-        <div class="param-row"><label>Kernel size</label><input type="range" id="gauss-kernel" min="51" max="401" step="2" value="201" oninput="updateVal('gauss-kernel-val', this.value); triggerPreview()"><span id="gauss-kernel-val">201</span></div>
-        <div class="param-row"><label>Sigma</label><input type="range" id="gauss-sigma" min="10" max="400" step="5" value="201" oninput="updateVal('gauss-sigma-val', this.value); triggerPreview()"><span id="gauss-sigma-val">201</span></div>
-      </div>
-      <div class="param-panel" id="morph-panel">
-        <h3>Morphological opening parameters</h3>
-        <div class="param-row"><label>Kernel size</label><input type="range" id="morph-kernel" min="1" max="21" step="2" value="7" oninput="updateVal('morph-kernel-val', this.value); triggerPreview()"><span id="morph-kernel-val">7</span></div>
-      </div>
-
-      <div style="margin-top:8px;"><strong style="font-size:13px;">Preprocessed preview</strong><img id="preprocessed-preview"></div>
-    </div>
-
-    <button class="btn btn-primary" onclick="confirmAndProceed()">Confirm & proceed to OCR →</button>
-    <div id="progress-bar-wrap" style="display:none; margin-top:12px;">
-    <div style="background:#e0ddd6; border-radius:999px; height:10px; overflow:hidden;">
-        <div id="progress-bar" style="height:100%; width:0%; background:#1a1a1a; border-radius:999px; transition:width 0.3s;"></div>
-    </div>
-    <div id="progress-label" style="font-size:12px; color:#666; margin-top:4px;"></div>
-    </div>
-    <div class="status" id="step1-status"></div>
-  </div>
-
-  <!-- PAGE 2 -->
-  <div class="tab-panel" id="tab-1">
-    <div class="card">
-      <h2>Image to process</h2>
-      <img id="page2-preview" style="max-width:100%; max-height:200px; border-radius:8px;">
-      <div class="status" id="step2-status">Upload and preprocess an image in Step 1 first.</div>
-    </div>
-
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.9)"></div><span><b>Green</b> &gt;60%</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(234,179,8,0.9)"></div><span><b>Yellow</b> 40–60%</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.9)"></div><span><b>Orange</b> 20–40%</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(220,38,38,0.9)"></div><span><b>Red</b> &lt;20%</span></div>
-    </div>
-
-    <button class="btn btn-primary" id="run-btn" onclick="runOCR()">▶ Run HTR model <span class="spinner" id="spinner"></span></button>
-    <div class="status" id="ocr-status"></div>
-    <br><br>
-
-    <div class="ocr-grid">
-      <div class="card"><h2>Detected regions</h2><img id="overlay-img"></div>
-      <div class="card"><h2>Predictions</h2><div id="prediction-box"></div></div>
-    </div>
-
-    <div class="card" style="margin-top:0;">
-      <h2>Edit predicted text</h2>
-      <textarea id="edited-text"></textarea>
-      <br><br>
-      <button class="btn btn-secondary" onclick="downloadTxt()">⬇ Download .txt</button>
-    </div>
-
-    <button class="btn btn-secondary" style="margin-top:8px;" onclick="switchTab(0)">← Back to Step 1</button>
-  </div>
+<!-- Lightbox -->
+<div id="lightbox" role="dialog" aria-label="Image zoom" onclick="closeLightbox()">
+  <div id="lightbox-close" aria-label="Close" onclick="closeLightbox()">&#x2715;</div>
+  <img id="lightbox-img" alt="Manuscript zoomed view">
 </div>
+
+<!-- Top bar -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <h1>Handwritten Text Recognition</h1>
+    <span>Old Nepali manuscripts</span>
+  </div>
+  <nav class="steps" aria-label="Workflow steps">
+    <div class="step" id="step-0" onclick="switchTab(0)" role="button" tabindex="0">
+      <div class="step-num" id="step-num-0">1</div>
+      <span>Upload</span>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step" id="step-1" onclick="switchTab(1)" role="button" tabindex="0">
+      <div class="step-num" id="step-num-1">2</div>
+      <span>Preprocess</span>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step" id="step-2" onclick="switchTab(2)" role="button" tabindex="0">
+      <div class="step-num" id="step-num-2">3</div>
+      <span>Transcribe</span>
+    </div>
+  </nav>
+</header>
+
+<main class="content">
+<div class="workspace">
+
+  <!-- ============================================================
+       Persistent image sidebar — visible across all tabs
+  ============================================================ -->
+  <aside class="image-sidebar">
+    <div class="sidebar-preview">
+      <div class="sidebar-placeholder" id="sidebar-ph">No image uploaded yet</div>
+      <img id="image-preview" alt="Uploaded manuscript" style="display:none;">
+      <div class="sidebar-label" id="sidebar-label" style="display:none;"></div>
+    </div>
+  </aside>
+
+  <!-- ============================================================
+       Tab content column
+  ============================================================ -->
+  <div class="tab-col">
+
+  <!-- Step 1 — Upload -->
+  <div class="tab-panel active" id="tab-0">
+    <p class="section-label">Input files</p>
+    <div class="card">
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="upload-zone">
+          <input type="file" id="image-file" accept="image/*" onchange="onImageChange(this)">
+          <div class="uz-icon">🖼</div>
+          <div class="uz-label">Manuscript image</div>
+          <div class="uz-sub">JPG or PNG</div>
+          <div class="uz-filename" id="img-filename"></div>
+        </div>
+        <div class="upload-zone">
+          <input type="file" id="xml-file" accept=".xml" onchange="onXmlChange(this)">
+          <div class="uz-icon">📎</div>
+          <div class="uz-label">Segmentation XML</div>
+          <div class="uz-sub">Optional · eScriptorium export</div>
+          <div class="uz-filename" id="xml-filename"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-primary" onclick="proceedToPreprocess()">
+        Continue
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+      </button>
+      <span class="status-error" id="step1-status"></span>
+    </div>
+  </div>
+
+
+  <!-- ============================================================
+       Step 2 — Preprocess
+  ============================================================ -->
+  <div class="tab-panel" id="tab-1">
+    <p class="section-label">Image preprocessing</p>
+
+    <div class="card">
+      <div class="card-header">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5.5"/><path d="M7 4.5v2.5l1.5 1.5"/></svg>
+        Enhancement methods
+      </div>
+      <div class="method-grid">
+        <label class="method-row">
+          <input type="checkbox" value="sauvola" onchange="toggleParam('sauvola-params', this); triggerPreview()">
+          Sauvola binarisation
+        </label>
+        <label class="method-row">
+          <input type="checkbox" value="clahe" onchange="toggleParam('clahe-params', this); triggerPreview()">
+          CLAHE contrast
+        </label>
+        <label class="method-row">
+          <input type="checkbox" value="gaussian" onchange="toggleParam('gaussian-params', this); triggerPreview()">
+          Gaussian normalisation
+        </label>
+        <label class="method-row">
+          <input type="checkbox" value="morph" onchange="toggleParam('morph-params', this); triggerPreview()">
+          Morphological opening
+        </label>
+      </div>
+      <p class="method-note">Applied sequentially: Gaussian → CLAHE → Sauvola → Morphological. Preview updates automatically.</p>
+
+      <div class="param-group" id="sauvola-params">
+        <p class="param-group-title">Sauvola — parameters</p>
+        <div class="param-row">
+          <label for="sauvola-window">Window size</label>
+          <input type="range" id="sauvola-window" min="11" max="101" step="2" value="35"
+                 oninput="setVal('sauvola-window-val', this.value); triggerPreview()">
+          <span class="val" id="sauvola-window-val">35</span>
+        </div>
+        <div class="param-row">
+          <label for="sauvola-k">Sensitivity (k)</label>
+          <input type="range" id="sauvola-k" min="0.05" max="0.5" step="0.01" value="0.2"
+                 oninput="setVal('sauvola-k-val', this.value); triggerPreview()">
+          <span class="val" id="sauvola-k-val">0.20</span>
+        </div>
+      </div>
+
+      <div class="param-group" id="clahe-params">
+        <p class="param-group-title">CLAHE — parameters</p>
+        <div class="param-row">
+          <label for="clahe-clip">Clip limit</label>
+          <input type="range" id="clahe-clip" min="1" max="80" step="0.5" value="30"
+                 oninput="setVal('clahe-clip-val', this.value); triggerPreview()">
+          <span class="val" id="clahe-clip-val">30</span>
+        </div>
+        <div class="param-row">
+          <label for="clahe-tile">Tile grid size</label>
+          <input type="range" id="clahe-tile" min="2" max="16" step="1" value="4"
+                 oninput="setVal('clahe-tile-val', this.value); triggerPreview()">
+          <span class="val" id="clahe-tile-val">4</span>
+        </div>
+      </div>
+
+      <div class="param-group" id="gaussian-params">
+        <p class="param-group-title">Gaussian normalisation — parameters</p>
+        <div class="param-row">
+          <label for="gauss-kernel">Kernel size</label>
+          <input type="range" id="gauss-kernel" min="51" max="401" step="2" value="201"
+                 oninput="setVal('gauss-kernel-val', this.value); triggerPreview()">
+          <span class="val" id="gauss-kernel-val">201</span>
+        </div>
+        <div class="param-row">
+          <label for="gauss-sigma">Sigma</label>
+          <input type="range" id="gauss-sigma" min="10" max="400" step="5" value="201"
+                 oninput="setVal('gauss-sigma-val', this.value); triggerPreview()">
+          <span class="val" id="gauss-sigma-val">201</span>
+        </div>
+      </div>
+
+      <div class="param-group" id="morph-params">
+        <p class="param-group-title">Morphological opening — parameters</p>
+        <div class="param-row">
+          <label for="morph-kernel">Kernel size</label>
+          <input type="range" id="morph-kernel" min="1" max="21" step="2" value="7"
+                 oninput="setVal('morph-kernel-val', this.value); triggerPreview()">
+          <span class="val" id="morph-kernel-val">7</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn" onclick="switchTab(0)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7H3M7 11 3 7l4-4"/></svg>
+        Back
+      </button>
+      <button class="btn btn-primary" onclick="confirmAndProceed()">
+        Run transcription
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4"/></svg>
+      </button>
+      <span class="status-text" id="step2-status"></span>
+    </div>
+  </div>
+
+
+  <!-- ============================================================
+       Step 3 — Transcribe
+  ============================================================ -->
+  <div class="tab-panel" id="tab-2">
+    <p class="section-label">Model inference</p>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div class="card-header" style="margin:0;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><path d="M4 7h6M4 4.5h6M4 9.5h4"/></svg>
+          HTR model
+        </div>
+        <button class="btn btn-primary" id="run-btn" onclick="runOCR()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" aria-hidden="true"><path d="M3 2.5l7 4-7 4V2.5z"/></svg>
+          Run
+          <span class="spinner" id="spinner"></span>
+        </button>
+      </div>
+      <div id="progress-bar-wrap" style="display:none;">
+        <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+        <div class="progress-meta">
+          <span id="progress-label">Starting…</span>
+          <span id="progress-pct">0%</span>
+        </div>
+      </div>
+      <p class="status-text" id="ocr-status" style="margin-top:8px;">Complete steps 1 and 2 first.</p>
+    </div>
+
+    <div class="result-grid">
+      <div class="card">
+        <div class="card-header">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5"/><path d="M4 4h6v6H4z"/></svg>
+          Detected regions
+        </div>
+        <img id="overlay-img" alt="Manuscript with detected line regions overlaid" style="display:none;">
+        <div class="preview-placeholder" id="overlay-placeholder">
+          <span>Run the model to see detected regions</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header" style="margin-bottom:10px;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 4h10M2 7h8M2 10h5"/></svg>
+          Predicted text
+        </div>
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(39,174,96,0.85)"></div>&gt;60%</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(183,149,11,0.85)"></div>40–60%</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(211,84,0,0.85)"></div>20–40%</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(192,57,43,0.85)"></div>&lt;20%</div>
+        </div>
+        <div id="prediction-box" aria-live="polite" style="color:var(--text-3); font-size:13px;">
+          Transcription will appear here. Hover over underlined characters to view per-token confidence scores and alternative readings.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M9.5 1.5h-7a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-7L9.5 1.5z"/><path d="M9 1.5V5h3.5"/></svg>
+        Post-correction
+      </div>
+      <textarea id="edited-text" placeholder="Edit the transcription here after reviewing the prediction above…"></textarea>
+      <div class="action-bar" style="margin-top:12px;">
+        <button class="btn" onclick="downloadTxt()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 1.5v7M3.5 6l3 3 3-3M1.5 10.5v1h10v-1"/></svg>
+          Download .txt
+        </button>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn" onclick="switchTab(1)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7H3M7 11 3 7l4-4"/></svg>
+        Back to preprocess
+      </button>
+    </div>
+  </div>
+
+  </div><!-- end tab-col -->
+</div><!-- end workspace -->
+</main>
 
 <script>
   let previewDebounce = null;
 
+  // ------------------------------------------------------------------
+  // Tab / stepper
+
   function switchTab(i) {
-    document.querySelectorAll('.tab-btn').forEach((b, j) => b.classList.toggle('active', i === j));
-    document.querySelectorAll('.tab-panel').forEach((p, j) => p.classList.toggle('active', i === j));
+    document.querySelectorAll('.tab-panel').forEach((el, j) => el.classList.toggle('active', j === i));
+    document.querySelectorAll('.step').forEach((el, j) => {
+      el.classList.toggle('active', j === i);
+      const num = document.getElementById('step-num-' + j);
+      if (j < i) {
+        el.classList.add('done');
+        num.innerHTML = '&#10003;';
+      } else {
+        el.classList.remove('done');
+        num.textContent = j + 1;
+      }
+      if (j === i) el.classList.remove('done');
+    });
   }
 
-  function updateVal(id, v) { document.getElementById(id).textContent = v; }
+  // ------------------------------------------------------------------
+  // Helpers
 
-  function togglePanel(id, cb) {
+  function setVal(id, v) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = parseFloat(v).toFixed(id.includes('-k') ? 2 : 0);
+  }
+
+  function toggleParam(id, cb) {
     document.getElementById(id).classList.toggle('visible', cb.checked);
   }
+
+  // ------------------------------------------------------------------
+  // Upload handlers
 
   function onImageChange(input) {
     const file = input.files[0];
@@ -691,10 +1156,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     document.getElementById('img-filename').textContent = file.name;
     const reader = new FileReader();
     reader.onload = e => {
-      const prev = document.getElementById('image-preview');
-      prev.src = e.target.result;
-      prev.style.display = 'block';
-      document.getElementById('page2-preview').src = e.target.result;
+      const img   = document.getElementById('image-preview');
+      const ph    = document.getElementById('sidebar-ph');
+      const label = document.getElementById('sidebar-label');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      img.onclick = openLightbox;
+      ph.style.display = 'none';
+      label.textContent = file.name;
+      label.style.display = 'block';
       triggerPreview();
     };
     reader.readAsDataURL(file);
@@ -704,6 +1174,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     if (input.files[0]) document.getElementById('xml-filename').textContent = input.files[0].name;
   }
 
+  // ------------------------------------------------------------------
+  // Preprocessing preview
+
   function triggerPreview() {
     clearTimeout(previewDebounce);
     previewDebounce = setTimeout(doPreview, 400);
@@ -712,103 +1185,192 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   async function doPreview() {
     const imgFile = document.getElementById('image-file').files[0];
     if (!imgFile) return;
-    const methods = [...document.querySelectorAll('.method-check input:checked')].map(c => c.value);
-    if (methods.length === 0) return;
-    const fd = new FormData();
-    fd.append('image', imgFile);
-    fd.append('methods', JSON.stringify(methods));
-    fd.append('sauvola_window', document.getElementById('sauvola-window').value);
-    fd.append('sauvola_k', document.getElementById('sauvola-k').value);
-    fd.append('clahe_clip', document.getElementById('clahe-clip').value);
-    fd.append('clahe_tile', document.getElementById('clahe-tile').value);
-    fd.append('gauss_kernel', document.getElementById('gauss-kernel').value);
-    fd.append('gauss_sigma', document.getElementById('gauss-sigma').value);
-    fd.append('morph_kernel', document.getElementById('morph-kernel').value);
-    const res = await fetch('/preprocess', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.image) {
-      const prev = document.getElementById('preprocessed-preview');
-      prev.src = 'data:image/png;base64,' + data.image;
-      prev.style.display = 'block';
-      document.getElementById('page2-preview').src = prev.src;
+    const methods = [...document.querySelectorAll('.method-row input:checked')].map(c => c.value);
+    if (methods.length === 0) {
+      // No methods selected — restore original image in sidebar
+      const orig = document.getElementById('image-preview');
+      if (orig.dataset.original) {
+        orig.src = orig.dataset.original;
+        document.getElementById('sidebar-label').textContent = imgFile.name;
+      }
+      return;
+    }
+
+    const fd = buildFormData(imgFile, methods);
+    try {
+      const res = await fetch('/preprocess', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.image) {
+        const img = document.getElementById('image-preview');
+        // Store original src on first preprocess so we can restore it later
+        if (!img.dataset.original) img.dataset.original = img.src;
+        img.src = 'data:image/png;base64,' + data.image;
+        document.getElementById('sidebar-label').textContent = 'Preprocessed preview';
+      }
+    } catch (err) {
+      console.error('Preview error:', err);
     }
   }
 
-  function confirmAndProceed() {
+  // ------------------------------------------------------------------
+  // Step navigation
+
+  function proceedToPreprocess() {
     if (!document.getElementById('image-file').files[0]) {
       document.getElementById('step1-status').textContent = 'Please upload an image first.';
       return;
     }
-    document.getElementById('step1-status').textContent = 'Ready!';
+    document.getElementById('step1-status').textContent = '';
+    // Restore original image if a preprocessed version is showing
+    const img = document.getElementById('image-preview');
+    if (img.dataset.original) {
+      img.src = img.dataset.original;
+      document.getElementById('sidebar-label').textContent = document.getElementById('img-filename').textContent;
+    }
     switchTab(1);
-    document.getElementById('step2-status').textContent = 'Ready to run OCR.';
   }
 
-  async function runOCR() {
-    const imgFile = document.getElementById('image-file').files[0];
-    if (!imgFile) { document.getElementById('ocr-status').textContent = 'No image — go back to Step 1.'; return; }
-    const runBtn = document.getElementById('run-btn');
-    runBtn.disabled = true;
-    document.getElementById('ocr-status').textContent = 'Running…';
-    document.getElementById('progress-bar-wrap').style.display = 'block';
-    document.getElementById('progress-bar').style.width = '0%';
-    document.getElementById('progress-label').textContent = 'Starting…';
+  function confirmAndProceed() {
+    document.getElementById('step2-status').textContent = 'Ready.';
+    switchTab(2);
+    document.getElementById('ocr-status').textContent = 'Ready to run.';
+  }
 
-    const methods = [...document.querySelectorAll('.method-check input:checked')].map(c => c.value);
-    const xmlFile = document.getElementById('xml-file').files[0];
+  // ------------------------------------------------------------------
+  // FormData builder (shared by preview and OCR)
+
+  function buildFormData(imgFile, methods) {
     const fd = new FormData();
     fd.append('image', imgFile);
     fd.append('methods', JSON.stringify(methods));
     fd.append('sauvola_window', document.getElementById('sauvola-window').value);
-    fd.append('sauvola_k', document.getElementById('sauvola-k').value);
-    fd.append('clahe_clip', document.getElementById('clahe-clip').value);
-    fd.append('clahe_tile', document.getElementById('clahe-tile').value);
-    fd.append('gauss_kernel', document.getElementById('gauss-kernel').value);
-    fd.append('gauss_sigma', document.getElementById('gauss-sigma').value);
-    fd.append('morph_kernel', document.getElementById('morph-kernel').value);
+    fd.append('sauvola_k',      document.getElementById('sauvola-k').value);
+    fd.append('clahe_clip',     document.getElementById('clahe-clip').value);
+    fd.append('clahe_tile',     document.getElementById('clahe-tile').value);
+    fd.append('gauss_kernel',   document.getElementById('gauss-kernel').value);
+    fd.append('gauss_sigma',    document.getElementById('gauss-sigma').value);
+    fd.append('morph_kernel',   document.getElementById('morph-kernel').value);
+    return fd;
+  }
+
+  // ------------------------------------------------------------------
+  // OCR runner (SSE streaming)
+
+  async function runOCR() {
+    const imgFile = document.getElementById('image-file').files[0];
+    if (!imgFile) {
+      document.getElementById('ocr-status').textContent = 'No image — return to step 1.';
+      return;
+    }
+
+    const runBtn   = document.getElementById('run-btn');
+    const spinner  = document.getElementById('spinner');
+    const statusEl = document.getElementById('ocr-status');
+    const progWrap = document.getElementById('progress-bar-wrap');
+    const progBar  = document.getElementById('progress-bar');
+    const progLbl  = document.getElementById('progress-label');
+    const progPct  = document.getElementById('progress-pct');
+
+    runBtn.disabled = true;
+    spinner.style.display = 'inline-block';
+    statusEl.textContent = 'Running…';
+    progWrap.style.display = 'block';
+    progBar.style.width = '0%';
+    progLbl.textContent = 'Initialising…';
+    progPct.textContent = '0%';
+
+    const methods = [...document.querySelectorAll('.method-row input:checked')].map(c => c.value);
+    const fd = buildFormData(imgFile, methods);
+    const xmlFile = document.getElementById('xml-file').files[0];
     if (xmlFile) fd.append('xml', xmlFile);
 
-    const res = await fetch('/ocr', { method: 'POST', body: fd });
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
+    try {
+      const res    = await fetch('/ocr', { method: 'POST', body: fd });
+      const reader = res.body.getReader();
+      const dec    = new TextDecoder();
+      let buf = '';
 
-    while (true) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n\n');
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\\n\\n');
         buf = lines.pop();
+
         for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = JSON.parse(line.slice(6));
-        if (data.progress !== undefined) {
+          if (!line.startsWith('data: ')) continue;
+          const data = JSON.parse(line.slice(6));
+
+          if (data.progress !== undefined) {
             const pct = Math.round((data.progress / data.total) * 100);
-            document.getElementById('progress-bar').style.width = pct + '%';
-            document.getElementById('progress-label').textContent = data.label;
-        } else if (data.done) {
-            document.getElementById('progress-bar').style.width = '100%';
-            document.getElementById('progress-label').textContent = 'Done!';
-            document.getElementById('overlay-img').src = 'data:image/png;base64,' + data.overlay;
-            document.getElementById('prediction-box').innerHTML = data.html;
+            progBar.style.width = pct + '%';
+            progLbl.textContent = data.label;
+            progPct.textContent = pct + '%';
+
+          } else if (data.done) {
+            progBar.style.width = '100%';
+            progLbl.textContent = 'Complete';
+            progPct.textContent = '100%';
+            statusEl.textContent = '';
+
+            const overlayImg  = document.getElementById('overlay-img');
+            const overlayPh   = document.getElementById('overlay-placeholder');
+            overlayImg.src    = 'data:image/png;base64,' + data.overlay;
+            overlayImg.style.display = 'block';
+            if (overlayPh) overlayPh.style.display = 'none';
+
+            const predBox = document.getElementById('prediction-box');
+            predBox.innerHTML = data.html;
+            predBox.style.color = '';
+            predBox.style.fontSize = '';
+
             document.getElementById('edited-text').value = data.plain_text;
-            document.getElementById('ocr-status').textContent = 'Done!';
-        } else if (data.error) {
-            document.getElementById('ocr-status').className = 'status error';
-            document.getElementById('ocr-status').textContent = 'Error: ' + data.error;
+
+          } else if (data.error) {
+            statusEl.className = 'status-error';
+            statusEl.textContent = 'Error: ' + data.error;
+          }
         }
-        }
+      }
+    } catch (err) {
+      statusEl.className = 'status-error';
+      statusEl.textContent = 'Network error: ' + err.message;
+    } finally {
+      runBtn.disabled = false;
+      spinner.style.display = 'none';
     }
-    runBtn.disabled = false;
-    }
+  }
+
+  // ------------------------------------------------------------------
+  // Download
 
   function downloadTxt() {
     const text = document.getElementById('edited-text').value;
-    const blob = new Blob([text], { type: 'text/plain' });
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'predictions.txt';
+    a.download = 'transcription.txt';
     a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ------------------------------------------------------------------
+  // Lightbox
+
+  function openLightbox() {
+    const src = document.getElementById('image-preview').src;
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').classList.add('open');
+    document.addEventListener('keydown', onLightboxKey);
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.removeEventListener('keydown', onLightboxKey);
+  }
+
+  function onLightboxKey(e) {
+    if (e.key === 'Escape') closeLightbox();
   }
 </script>
 </body>
@@ -830,13 +1392,20 @@ def preprocess():
         methods = json.loads(request.form.get('methods', '[]'))
         pil_img = Image.open(io.BytesIO(file.read())).convert("RGB")
         if "gaussian" in methods:
-            pil_img = apply_gaussian_normalization(pil_img, kernel_size=int(request.form.get('gauss_kernel', 201)), sigma=int(request.form.get('gauss_sigma', 201)))
+            pil_img = apply_gaussian_normalization(pil_img,
+                kernel_size=int(request.form.get('gauss_kernel', 201)),
+                sigma=int(request.form.get('gauss_sigma', 201)))
         if "clahe" in methods:
-            pil_img = apply_clahe(pil_img, clip_limit=float(request.form.get('clahe_clip', 30.0)), tile_grid_size=int(request.form.get('clahe_tile', 4)))
+            pil_img = apply_clahe(pil_img,
+                clip_limit=float(request.form.get('clahe_clip', 30.0)),
+                tile_grid_size=int(request.form.get('clahe_tile', 4)))
         if "sauvola" in methods:
-            pil_img = apply_sauvola(pil_img, window_size=int(request.form.get('sauvola_window', 35)), k=float(request.form.get('sauvola_k', 0.2)))
+            pil_img = apply_sauvola(pil_img,
+                window_size=int(request.form.get('sauvola_window', 35)),
+                k=float(request.form.get('sauvola_k', 0.2)))
         if "morph" in methods:
-            pil_img = apply_morph_opening(pil_img, kernel_size=int(request.form.get('morph_kernel', 7)))
+            pil_img = apply_morph_opening(pil_img,
+                kernel_size=int(request.form.get('morph_kernel', 7)))
         return jsonify({'image': pil_to_base64(pil_img)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -849,13 +1418,20 @@ def ocr():
         methods = json.loads(request.form.get('methods', '[]'))
         pil_img = Image.open(io.BytesIO(file.read())).convert("RGB")
         if "gaussian" in methods:
-            pil_img = apply_gaussian_normalization(pil_img, kernel_size=int(request.form.get('gauss_kernel', 201)), sigma=int(request.form.get('gauss_sigma', 201)))
+            pil_img = apply_gaussian_normalization(pil_img,
+                kernel_size=int(request.form.get('gauss_kernel', 201)),
+                sigma=int(request.form.get('gauss_sigma', 201)))
         if "clahe" in methods:
-            pil_img = apply_clahe(pil_img, clip_limit=float(request.form.get('clahe_clip', 30.0)), tile_grid_size=int(request.form.get('clahe_tile', 4)))
+            pil_img = apply_clahe(pil_img,
+                clip_limit=float(request.form.get('clahe_clip', 30.0)),
+                tile_grid_size=int(request.form.get('clahe_tile', 4)))
         if "sauvola" in methods:
-            pil_img = apply_sauvola(pil_img, window_size=int(request.form.get('sauvola_window', 35)), k=float(request.form.get('sauvola_k', 0.2)))
+            pil_img = apply_sauvola(pil_img,
+                window_size=int(request.form.get('sauvola_window', 35)),
+                k=float(request.form.get('sauvola_k', 0.2)))
         if "morph" in methods:
-            pil_img = apply_morph_opening(pil_img, kernel_size=int(request.form.get('morph_kernel', 7)))
+            pil_img = apply_morph_opening(pil_img,
+                kernel_size=int(request.form.get('morph_kernel', 7)))
         xml_bytes = request.files['xml'].read() if 'xml' in request.files else None
 
         import queue, threading
@@ -887,10 +1463,10 @@ def ocr():
         return app.response_class(stream(), mimetype='text/event-stream')
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 
 if __name__ == '__main__':
-    print("Loading model...")
+    print("Loading model…")
     load_model()
-    print("Model ready!")
+    print("Model ready.")
     app.run(host='0.0.0.0', port=5001)
