@@ -1,0 +1,123 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result</title>
+    <style>
+        .container {
+            display: flex;
+            gap: 40px;
+            padding: 20px;
+        }
+        .column {
+            flex: 1;
+            text-align: center;
+        }
+        img {
+            width: 100%;
+            max-width: 500px;
+            cursor: zoom-in;
+        }
+    </style>
+</head>
+<body>
+    <h1> Result </h1>
+    <div class="container">
+        <div class="column">
+            <h3> Original image</h3>
+            <img src="{{ instance.original_image.url }}" alt="Original Image" onclick="openLightbox(this)" />
+        </div>
+        <div class="column">
+            <h3> Cleaned image</h3>
+            <img src="{{ instance.processed.url }}" alt="Processed Image" onclick="openLightbox(this)"/>
+        </div>
+    </div>
+
+    <br>
+    <a href="/"> Upload another image </a>
+    
+
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Result</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f0; margin: 0; padding: 2rem 1rem; color: #1a1a1a; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    h1 { font-size: 1.4rem; font-weight: 500; margin: 0; }
+    .actions { display: flex; gap: 8px; }
+    .btn { padding: 7px 14px; border: 1px solid #ccc; border-radius: 7px; font-size: 0.85rem; background: #fff; cursor: pointer; text-decoration: none; color: #1a1a1a; }
+    .btn:hover { background: #f0f0ea; }
+    .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.5rem; }
+    .compare { display: flex; gap: 1.5rem; align-items: flex-start; }
+    .col { flex: 1; min-width: 0; }
+    .col-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin: 0 0 8px; }
+    .img-wrap { border: 1px solid #e0e0d8; border-radius: 8px; overflow: hidden; background: #fafaf8; cursor: zoom-in; }
+    .img-wrap img { width: 100%; height: auto; display: block; }
+    .arrow { display: flex; align-items: center; padding-top: 2rem; color: #bbb; font-size: 1.5rem; }
+    .hint { margin-top: 1rem; font-size: 0.8rem; color: #999; text-align: center; }
+
+    /* lightbox */
+    .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 6px; }
+    .lightbox-close { position: fixed; top: 1rem; right: 1.25rem; color: #fff; font-size: 2rem; cursor: pointer; line-height: 1; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <h1>Cleaned output</h1>
+    <div class="actions">
+      <a class="btn" href="{{ instance.processed.url }}" download>↓ Download</a>
+      <a class="btn" href="/">Upload another</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <p style="font-size:0.85rem; color:#888; margin:0 0 1.25rem;">Gaussian background normalization applied.</p>
+    <div class="compare">
+      <div class="col">
+        <p class="col-label">Original</p>
+        <div class="img-wrap" onclick="openLightbox('{{ instance.original_image.url }}')">
+          <img src="{{ instance.original_image.url }}" alt="Original scanned image">
+        </div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="col">
+        <p class="col-label">Cleaned</p>
+        <div class="img-wrap" onclick="openLightbox('{{ instance.processed.url }}')">
+          <img src="{{ instance.processed.url }}" alt="Processed image">
+        </div>
+      </div>
+    </div>
+    <p class="hint">Click either image to zoom in.</p>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">×</span>
+  <img id="lightbox-img" src="" alt="Zoomed image">
+</div>
+
+<script>
+function openLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+</script>
+</body>
+</html>
