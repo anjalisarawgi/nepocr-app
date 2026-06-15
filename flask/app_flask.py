@@ -610,7 +610,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   .workspace {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 420px 1fr;
     gap: 20px;
     align-items: start;
   }
@@ -901,16 +901,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <div class="upload-zone">
           <input type="file" id="image-file" accept="image/*" onchange="onImageChange(this)">
-          <div class="uz-icon">🖼</div>
           <div class="uz-label">Manuscript image</div>
           <div class="uz-sub">JPG or PNG</div>
           <div class="uz-filename" id="img-filename"></div>
         </div>
         <div class="upload-zone">
-          <input type="file" id="xml-file" accept=".xml" onchange="onXmlChange(this)">
-          <div class="uz-icon">📎</div>
+          <input type="file" id="xml-file" accept=".xml" onchange="onXmlChange(this)" onchange="onXmlChange(this)">
           <div class="uz-label">Segmentation XML</div>
-          <div class="uz-sub">Optional · eScriptorium export</div>
+          <div class="uz-sub">Optional · (1) you can upload .xml from eScriptorium export OR use the default kraken</div>
           <div class="uz-filename" id="xml-filename"></div>
         </div>
       </div>
@@ -1113,8 +1111,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </div><!-- end workspace -->
 </main>
 
+
 <script>
   let previewDebounce = null;
+  let cachedXmlStr = null;
+
 
   // ------------------------------------------------------------------
   // Tab / stepper
@@ -1165,15 +1166,54 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       ph.style.display = 'none';
       label.textContent = file.name;
       label.style.display = 'block';
+      if (cachedXmlStr) drawXmlOverlay(cachedXmlStr);
       triggerPreview();
     };
     reader.readAsDataURL(file);
   }
 
   function onXmlChange(input) {
-    if (input.files[0]) document.getElementById('xml-filename').textContent = input.files[0].name;
-  }
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById('xml-filename').textContent = file.name;
 
+    const reader = new FileReader();
+    reader.onload = e => {
+        cachedXmlStr = e.target.result;
+        drawXmlOverlay(cachedXmlStr);
+    };
+    reader.readAsText(file);
+    }
+
+    async function drawXmlOverlay(xmlStr) {
+    const imgFile = document.getElementById('image-file').files[0];
+    const xmlFile = document.getElementById('xml-file').files[0];
+    if (!imgFile || !xmlFile) return;
+
+    const img   = document.getElementById('image-preview');
+    const label = document.getElementById('sidebar-label');
+    img.style.opacity = '0.4';
+    label.textContent = 'Detecting regions…';
+
+    const fd = new FormData();
+    fd.append('image', imgFile);
+    fd.append('xml', xmlFile);
+
+    try {
+        const res  = await fetch('/overlay', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.image) {
+        if (!img.dataset.original) img.dataset.original = img.src;
+        img.src = 'data:image/png;base64,' + data.image;
+        label.textContent = `${data.count} regions detected`;
+        }
+    } catch (err) {
+        console.error('Overlay error:', err);
+        label.textContent = 'Overlay failed';
+    } finally {
+        img.style.opacity = '1';
+    }
+    }
   // ------------------------------------------------------------------
   // Preprocessing preview
 
@@ -1196,20 +1236,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       return;
     }
 
-    const fd = buildFormData(imgFile, methods);
-    try {
-      const res = await fetch('/preprocess', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (data.image) {
-        const img = document.getElementById('image-preview');
-        // Store original src on first preprocess so we can restore it later
-        if (!img.dataset.original) img.dataset.original = img.src;
-        img.src = 'data:image/png;base64,' + data.image;
-        document.getElementById('sidebar-label').textContent = 'Preprocessed preview';
-      }
-    } catch (err) {
-      console.error('Preview error:', err);
-    }
+   const img = document.getElementById('image-preview');
+        img.style.opacity = '0.4';
+        img.style.transition = 'opacity 0.15s';
+        document.getElementById('sidebar-label').textContent = 'Processing…';
+
+        const fd = buildFormData(imgFile, methods);
+        try {
+        const res = await fetch('/preprocess', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.image) {
+            if (!img.dataset.original) img.dataset.original = img.src;
+            img.src = 'data:image/png;base64,' + data.image;
+            document.getElementById('sidebar-label').textContent = 'Preprocessed preview';
+        }
+        } catch (err) {
+        console.error('Preview error:', err);
+        document.getElementById('sidebar-label').textContent = 'Preview failed';
+        } finally {
+        img.style.opacity = '1';
+        }
   }
 
   // ------------------------------------------------------------------
@@ -1410,6 +1456,19 @@ def preprocess():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/overlay', methods=['POST'])
+def overlay():
+    try:
+        file    = request.files['image']
+        xml_file = request.files['xml']
+        pil_img = Image.open(io.BytesIO(file.read())).convert("RGB")
+        xml_bytes = xml_file.read()
+        boxes = parse_boxes_from_xml(xml_bytes, level="line", image_size=pil_img.size)
+        boxes = sort_boxes_reading_order(boxes)
+        overlay_img = draw_boxes(pil_img, boxes)
+        return jsonify({'image': pil_to_base64(overlay_img), 'count': len(boxes)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/ocr', methods=['POST'])
 def ocr():
