@@ -1,15 +1,71 @@
-<!DOCTYPE html>
-<html lang="en">
+
+ <!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+  <title>NepOCR</title>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'EB Garamond', serif; 
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFF;
+      padding: 2rem;
+    }
+    .card { width: 100%; max-width: 360px; }
+    .app { text-align: center; margin-bottom: 36px; }
+    .app-name { font-size: 32px;  color: #111; letter-spacing: -0.5px; font-weight: 600; font-family: 'Georgia', serif; }
+    .app-tag { font-size: 16px; color: #757373; margin-top: 4px; font-family: 'EB Garamond', serif; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: #666; margin-bottom: 6px; }
+    .field input {
+      width: 100%; padding: 9px 12px; font-size: 14px;
+      border: 0.5px solid #EBEBEB; border-radius: 2px;
+      background: #EBEBEB; color: #111; outline: none;
+    }
+    .field input:focus { border-color: #2D131B; box-shadow: 0 0 0 3px #dce8f7; }
+    .errorlist { color: #9B3A2A; font-size: 12px; margin-top: 4px; list-style: none; }
+    .login-btn {
+      width: 100%; margin-top: 8px; padding: 10px;
+      font-size: 14px; font-weight: 500;
+      background: #2D131B; color: #EBEBEB;
+      border: none; border-radius: 6px; cursor: pointer;
+      font-family: 'EB Garamond', serif; 
+    }
+    .login-btn:hover { background: #1a0b10; }
+  </style>
 </head>
 <body>
+  <div class="card">
+    <div class="app">
+      <div class="app-name">nepOCR</div>
+      <div class="app-tag">Old Nepali manuscript HTR</div>
+    </div>
     <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type = "submit">Login</button>
+      {% csrf_token %}
+
+      {%  if form.errors %}
+        <div style="background:#fdf0ee; border: 0.5px solid #e8b4ac; border-radius:4px; padding: 10px 12px; margin-bottom:16px; font-size:13px; color:#9B3A2A;">
+            Invalid username or password
+        </div>
+        {% endif %}
+
+      <div class="field">
+        <label>Username</label>
+        {{ form.username }}
+        {{ form.username.errors }}
+      </div>
+      <div class="field">
+        <label>Password</label>
+        {{ form.password }}
+        {{ form.password.errors }}
+      </div>
+      <button type="submit" class="login-btn">Sign in</button>
     </form>
- </body>
+  </div>
+</body>
 </html>

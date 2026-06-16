@@ -1,29 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Result</title>
-    <style>
-        .container {
-            display: flex;
-            gap: 40px;
-            padding: 20px;
-        }
-        .column {
-            flex: 1;
-            text-align: center;
-        }
-        img {
-            width: 100%;
-            max-width: 500px;
-            cursor: zoom-in;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; }
-    </style>
+  <title>NepOCR — Run OCR</title>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+ <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Inter', sans-serif; }
+ </style>
 </head>
-<body>
+<body style="margin:0; font-family:'Inter', sans-serif; background:#fff;">
+
     <nav style="background:#F2F0EE; border-bottom: 0.5px solid #DAD8D5; padding: 0 24px; font-family:'Inter', sans-serif;">
         <div style="display:flex; align-items:center; justify-content:space-between; padding: 14px 0 10px;">
           <div style="display:flex; align-items:baseline; gap:12px;">
@@ -50,22 +36,11 @@
       </nav>
     
     
-      
-    <h1> Result </h1>
-    <div class="container">
-        <div class="column">
-            <h3> Original image</h3>
-            <img src="{{ instance.original_image.url }}" alt="Original Image" onclick="openLightbox(this)" />
-        </div>
-        <div class="column">
-            <h3>Cleaned image</h3>
-            <img src="{{ instance.processed.url }}" alt="Processed Image" onclick="openLightbox(this)"/>
-        </div>
-    </div>
 
-    <br>
-    <a href="/"> Upload another image </a>
+  <div style="max-width:600px; margin:80px auto; text-align:center; padding: 0 24px;">
+    <div style="font-family:'EB Garamond', serif; font-size:28px; color:#2D131B; margin-bottom:10px;">Run OCR</div>
+    <div style="font-size:13px; color:#A09E9C;">This feature is coming soon.</div>
+  </div>
 
 </body>
 </html>
-

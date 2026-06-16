@@ -42,6 +42,7 @@ def upload_image(request):
             instance = form.save(commit=False) # create an instance of the UploadedImage model but dont save it to the database yet
             instance.user = request.user # attach the loggedin user
             instance.save() # now save to db
+            request.session['current_image_pk']= instance.pk # save to session
             return redirect('preprocess', pk = instance.pk)
     else:
         form = ImageUploadForm()
@@ -52,7 +53,7 @@ def upload_image(request):
 @login_required
 def preprocess_image(request, pk):
     instance = UploadedImage.objects.get(pk=pk, user=request.user) # get the uploaded image instance from the database, and make sure it belongs to the logged in user
-
+    request.session['current_image_pk'] = pk
     # read the uploaded image:
     img_path = instance.original_image.path
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
@@ -66,11 +67,23 @@ def preprocess_image(request, pk):
     file_content = ContentFile(buffer.tobytes(), name = f'processed_{pk}.png') # convert the processed image to a format that can be saved in the database
     instance.processed.save(f'processed_{pk}.png', file_content, save = True) # save the processed image to the database
 
-    return render(request, 'htr/result.html', {'instance': instance}) # instance is 
-
+    return render(request, 'htr/result.html', {'instance': instance, 'current_pk': pk}) # instance is 
 
 
 @login_required
 def history_view(request):
     images = UploadedImage.objects.filter(user = request.user).order_by('-uploaded_at')
     return render(request, 'htr/history.html', {'images': images})
+
+
+@login_required
+def run_ocr(request):
+    current_pk = request.session.get('current_image_pk')
+    return render(request, 'htr/run_ocr.html', {'current_pk': current_pk})
+
+
+@login_required
+def export(request):
+    current_pk = request.session.get('current_image_pk')
+    return render(request, 'htr/export.html', {'current_pk': current_pk})
+

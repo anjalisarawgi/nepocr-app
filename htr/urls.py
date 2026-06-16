@@ -8,6 +8,8 @@ urlpatterns =[
     path('login/', views.login_view, name = 'login'),
     path('logout/', views.logout_view, name = 'logout'),
     path('history/', views.history_view, name = 'history'),
+    path('run_ocr/', views.run_ocr, name = 'run_ocr'),
+    path('export/', views.export, name = 'export'),
 ]
 
 #
