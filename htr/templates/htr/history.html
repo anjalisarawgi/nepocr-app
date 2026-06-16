@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My documents</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+    
+        nav { display: flex; justify-content: flex-end; gap: 20px; margin-bottom: 30px; }
+        nav a { text-decoration: none; color: #333; font-weight: bold; }
+        nav a:hover { color: #000; }
+    
+        h2 { margin-bottom: 20px; }
+    
+        .card {
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          padding: 16px;
+          margin-bottom: 24px;
+        }
+        .card p { font-size: 13px; color: #666; margin-bottom: 12px; }
+    
+        .images {
+          display: flex;
+          gap: 16px;
+        }
+        .images div { flex: 1; text-align: center; }
+        .images img {
+          width: 100%;
+          max-height: 300px;
+          object-fit: contain;
+          border: 1px solid #eee;
+          border-radius: 4px;
+        }
+        .images span { display: block; font-size: 12px; color: #888; margin-top: 6px; }
+    
+        .empty { color: #888; margin-top: 40px; text-align: center; }
+      </style>
+</head>
+<body>
+    <nav>
+        <a href="{% url 'upload' %}">Upload</a>
+        <a href="{% url 'history' %}">History</a>
+        <a href="{% url 'logout' %}">Logout</a>
+    </nav>
+
+    <h2>All documents uploaded</h2>
+
+    {% if images %}
+        {% for img in images%}
+            <div class="card">
+                <p>Uploaded: {{ img.uploaded_at|date:"d M Y, H:i" }}</p>
+                <div class="images">
+                    <div>
+                        <img src="{{ img.original_image.url }}", alt="Original"> 
+                        <span>Original</span>
+                    </div>
+                    <div>
+                        {% if img.processed %}
+                        <img src ="{{ img.processed.url }}", alt = "Cleaned">
+                        <span>Cleaned</span>
+                        {% else %}
+                            <span>Image not yet processed</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+    {% else %}
+        <p class = "empty">No uploads yet</p>
+
+    {% endif %}
+</body>
+</html>

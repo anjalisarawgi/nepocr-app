@@ -4,13 +4,44 @@ import numpy as np
 from django.core.files.base import ContentFile
 from .models import UploadedImage
 from .forms import ImageUploadForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 
 
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('upload')
+    if request.method == 'POST':
+        form = AuthenticationForm(data = request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect('upload')
+        
+    else: 
+        form = AuthenticationForm()
+    return render(request, 'htr/login.html', {'form': form})
+        
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+        
+
+
+
+@login_required
 def upload_image(request):
     if request.method == 'POST':
         form = ImageUploadForm(request.POST, request.FILES) # POST contains the form fields eg text, checkboxes adn FILES contains the uploaded files
         if form.is_valid(): # checks if valid, and if not, go to else and if yes, save it to the database and redirect to the preprocess page
-            instance = form.save() 
+            instance = form.save(commit=False) # create an instance of the UploadedImage model but dont save it to the database yet
+            instance.user = request.user # attach the loggedin user
+            instance.save() # now save to db
             return redirect('preprocess', pk = instance.pk)
     else:
         form = ImageUploadForm()
@@ -18,9 +49,9 @@ def upload_image(request):
 
 
 
-
+@login_required
 def preprocess_image(request, pk):
-    instance = UploadedImage.objects.get(pk=pk)
+    instance = UploadedImage.objects.get(pk=pk, user=request.user) # get the uploaded image instance from the database, and make sure it belongs to the logged in user
 
     # read the uploaded image:
     img_path = instance.original_image.path
@@ -37,3 +68,9 @@ def preprocess_image(request, pk):
 
     return render(request, 'htr/result.html', {'instance': instance}) # instance is 
 
+
+
+@login_required
+def history_view(request):
+    images = UploadedImage.objects.filter(user = request.user).order_by('-uploaded_at')
+    return render(request, 'htr/history.html', {'images': images})

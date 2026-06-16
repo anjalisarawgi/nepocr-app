@@ -1,4 +1,4 @@
-<!-- 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,122 +7,19 @@
     <title>Upload Image</title>
 </head>
 <body>
+  <nav>
+    <a href="{% url 'upload' %}">Upload</a>
+    <a href="{% url 'history' %}">History</a>
+    <a href="{% url 'logout' %}">Logout</a>
+</nav>
+
     <h1> Please upload an IMage</h1>
     <form method ="POST" enctype = "multipart/form-data">
     {% csrf_token %} 
     {{ form }}
     <button type = "submit"> Upload </button>
     </form>
-</body>
-</html> -->
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upload Image</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; background: #f5f5f0; margin: 0; padding: 2rem 1rem; color: #1a1a1a; }
-    .container { max-width: 560px; margin: 0 auto; }
-    h1 { font-size: 1.4rem; font-weight: 500; margin: 0 0 0.25rem; }
-    .subtitle { font-size: 0.875rem; color: #666; margin: 0 0 1.5rem; }
-    .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.5rem; }
-    .drop-zone {
-      border: 1.5px dashed #ccc; border-radius: 8px;
-      padding: 2.5rem 1rem; text-align: center; cursor: pointer;
-      transition: background 0.15s;
-    }
-    .drop-zone.dragover { background: #f0f0ea; border-color: #999; }
-    .drop-zone p { margin: 0.25rem 0; }
-    .drop-label { font-size: 0.95rem; }
-    .drop-sub { font-size: 0.8rem; color: #888; }
-    .browse-btn {
-      margin-top: 0.75rem; display: inline-block;
-      padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
-      font-size: 0.85rem; background: #fff; cursor: pointer;
-    }
-    .preview-row {
-      display: none; margin-top: 1rem;
-      align-items: center; gap: 10px;
-      background: #f8f8f4; border-radius: 8px; padding: 10px 14px;
-    }
-    .preview-row .fname { font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .preview-row .fsize { font-size: 0.75rem; color: #888; }
-    .ready-badge { font-size: 0.75rem; background: #e6f4ea; color: #2e7d32; padding: 2px 8px; border-radius: 5px; }
-    .submit-row { display: flex; justify-content: flex-end; margin-top: 1.25rem; }
-    .submit-btn {
-      padding: 8px 20px; background: #1a1a1a; color: #fff;
-      border: none; border-radius: 7px; font-size: 0.9rem; cursor: pointer;
-    }
-    .submit-btn:hover { opacity: 0.85; }
-    .error { color: #c62828; font-size: 0.85rem; margin: 0.5rem 0 0; }
-  </style>
-</head>
-<body>
-<div class="container">
-  <h1>Nepali manuscript cleaner</h1>
-  <p class="subtitle">Upload a scanned page — background normalization is applied automatically.</p>
-
-  <div class="card">
-    <form method="post" enctype="multipart/form-data" id="upload-form">
-      {% csrf_token %}
-
-      <div class="drop-zone" id="drop-zone">
-        <p class="drop-label">Drag & drop your image here</p>
-        <p class="drop-sub">PNG, JPG, TIFF · max 20 MB</p>
-        <label class="browse-btn">
-          Browse files
-          <input type="file" name="original_image" id="file-input" accept="image/*" style="display:none" required>
-        </label>
-      </div>
-
-      {% if form.errors %}
-        <p class="error">{{ form.errors }}</p>
-      {% endif %}
-
-      <div class="preview-row" id="preview-row">
-        <div>
-          <p class="fname" id="file-name"></p>
-          <p class="fsize" id="file-size"></p>
-        </div>
-        <span class="ready-badge">✓ Ready</span>
-      </div>
-
-      <div class="submit-row">
-        <button type="submit" class="submit-btn">Preprocess image →</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-const input = document.getElementById('file-input');
-const dropZone = document.getElementById('drop-zone');
-const previewRow = document.getElementById('preview-row');
-
-function showPreview(file) {
-  document.getElementById('file-name').textContent = file.name;
-  document.getElementById('file-size').textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
-  previewRow.style.display = 'flex';
-}
-
-input.addEventListener('change', () => { if (input.files[0]) showPreview(input.files[0]); });
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    input.files = dt.files;
-    showPreview(file);
-  }
-});
-</script>
+    <p>Logged in as {{ request.user.username }} | <a href="{% url 'logout' %}">Logout</a></p>
 </body>
 </html>
+
