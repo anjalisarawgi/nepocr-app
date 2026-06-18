@@ -49,7 +49,7 @@
       text-decoration: none; border-bottom: 2px solid transparent; transition: color 0.1s;
     }
     .tab:hover { color: #1a1a1a; }
-    .tab.active { color: #1a1a1a; font-weight: 500; }
+    .tab.active { color: #1a1a1a; font-weight: 500; border-bottom-color: #f5ba24; }
     .tab.disabled { color: #C8C6C4; cursor: not-allowed; pointer-events: none; }
 
     .page { padding: 32px 28px; }
@@ -190,7 +190,7 @@
               <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 9 12 4 17 9"/><line x1="12" y1="4" x2="12" y2="16"/>
             </svg>
             <span class="drop-label"><u>Choose image</u> or drag &amp; drop</span>
-            <span class="drop-hint" id="img-hint">Format: JPG, PNG, TIFF</span>
+            <span class="drop-hint" id="img-hint">JPG, PNG, TIFF accepted</span>
             <input id="file-input" name="image" type="file" accept="image/*" style="display:none;">
           </label>
         </div>
@@ -200,8 +200,8 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/>
             </svg>
-            <span class="drop-label"><u>Segmentated file (XML) </u> or drag &amp; drop</span>
-            <span class="drop-hint" id="xml-hint">XML file from eScriptorium export (optional)</span>
+            <span class="drop-label"><u>Choose XML</u> or drag &amp; drop</span>
+            <span class="drop-hint" id="xml-hint">PAGE XML layout file (optional)</span>
             <input id="xml-input" name="xml" type="file" accept=".xml" style="display:none;">
           </label>
         </div>

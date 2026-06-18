@@ -10,6 +10,7 @@ urlpatterns =[
     path('history/', views.history_view, name = 'history'),
     path('run_ocr/', views.run_ocr, name = 'run_ocr'),
     path('export/', views.export, name = 'export'),
+    path('segment/', views.segment, name = 'segment'),
 ]
 
 #

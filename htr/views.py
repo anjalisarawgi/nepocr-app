@@ -87,3 +87,7 @@ def export(request):
     current_pk = request.session.get('current_image_pk')
     return render(request, 'htr/export.html', {'current_pk': current_pk})
 
+@login_required
+def segment(request):
+    current_pk = request.session.get('current_image_pk')
+    return render(request, 'htr/segment.html', {'current_pk': current_pk})

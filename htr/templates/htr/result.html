@@ -43,7 +43,7 @@
           {% else %}
             <a style="padding:10px 20px; font-size:13px; color:#C8C6C4; border-bottom:2px solid transparent; cursor:not-allowed;">Preprocess</a>
           {% endif %}
-    
+          <a href="{% url 'segment' %}" style="padding:10px 20px; font-size:13px; color:#A09E9C; text-decoration:none; border-bottom:2px solid transparent;">Segmentation</a>
           <a href="{% url 'run_ocr' %}" style="padding:10px 20px; font-size:13px; color:#A09E9C; text-decoration:none; border-bottom:2px solid transparent;">Run OCR</a>
           <a href="{% url 'export' %}" style="padding:10px 20px; font-size:13px; color:#A09E9C; text-decoration:none; border-bottom:2px solid transparent;">Export</a>
         </div>
