@@ -11,6 +11,7 @@ urlpatterns =[
     path('run_ocr/', views.run_ocr, name = 'run_ocr'),
     path('export/', views.export, name = 'export'),
     path('segment/', views.segment, name = 'segment'),
+    path('clear-image/', views.clear_current_image, name = 'clear_current_image')
 ]
 
 #

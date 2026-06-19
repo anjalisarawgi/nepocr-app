@@ -46,7 +46,12 @@ def upload_image(request):
             return redirect('preprocess', pk = instance.pk)
     else:
         form = ImageUploadForm()
-    return render(request, 'htr/upload.html', {'form': form}) # page 1  = upload page
+
+    current_pk = request.session.get('current_image_pk')
+    current_image = None
+    if current_pk:
+        current_image = UploadedImage.objects.filter(pk = current_pk, user = request.user).first()# user = request.user makes sure that the user can only ever se etheir own image, 
+    return render(request, 'htr/upload.html', {'form': form, 'current_pk': current_pk, 'current_image': current_image}) # page 1  = upload page  # 
 
 
 
@@ -67,7 +72,7 @@ def preprocess_image(request, pk):
     file_content = ContentFile(buffer.tobytes(), name = f'processed_{pk}.png') # convert the processed image to a format that can be saved in the database
     instance.processed.save(f'processed_{pk}.png', file_content, save = True) # save the processed image to the database
 
-    return render(request, 'htr/result.html', {'instance': instance, 'current_pk': pk}) # instance is 
+    return render(request, 'htr/preprocess.html', {'instance': instance, 'current_pk': pk}) # instance is 
 
 
 @login_required
@@ -91,3 +96,8 @@ def export(request):
 def segment(request):
     current_pk = request.session.get('current_image_pk')
     return render(request, 'htr/segment.html', {'current_pk': current_pk})
+
+@login_required
+def clear_current_image(request):
+    request.session.pop('current_image_pk', None)
+    return redirect('upload')
