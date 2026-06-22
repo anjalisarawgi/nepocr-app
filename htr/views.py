@@ -58,3 +58,32 @@ def delete_image(request, pk):
     image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
     image.delete()
     return redirect('main_page')
+
+
+from django.http import JsonResponse
+
+@login_required
+def crop_image(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        cropped_file = request.FILES.get('cropped_image')
+        if cropped_file:
+            # Only back up the very first time this image is cropped
+            if not image.original_backup:
+                image.original_image.open()
+                image.original_backup.save(image.filename, image.original_image, save=False)
+
+            image.original_image.save(image.filename, cropped_file, save=True)
+            return JsonResponse({'success': True, 'new_url': image.original_image.url, 'has_backup': True})
+    return JsonResponse({'success': False})
+
+
+@login_required
+def reset_image(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        if image.original_backup:
+            image.original_image.save(image.filename, image.original_backup, save=True)
+            image.original_backup.delete(save=True)
+            return JsonResponse({'success': True, 'new_url': image.original_image.url})
+    return JsonResponse({'success': False})

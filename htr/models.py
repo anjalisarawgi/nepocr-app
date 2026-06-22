@@ -15,6 +15,7 @@ class UploadedImage(models.Model):
     original_image = models.ImageField(upload_to="uploads/") # file path of the image the user uploads
     processed = models.ImageField(upload_to = "processed/", blank = True, null = True) # this field will store the file path of the image after preprocessing
     uploaded_at = models.DateTimeField(auto_now_add=True) # timestamp of when the image was uploaded
+    original_backup = models.ImageField(upload_to="backups/", blank=True, null=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default = "uploaded")
 
