@@ -86,8 +86,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'htr_app',
-        'USER': 'admin_test',
-        'PASSWORD': 'admin_test',
+        'USER': 'anjalisarawgi',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '5432',
 
