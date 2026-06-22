@@ -1,12 +1,13 @@
 // Exclusive accordion: opening one section closes the others.
-const sections = document.querySelectorAll('.accordion-section:not(.locked)');
-sections.forEach((section) => {
-  const header = section.querySelector('.accordion-header');
-  header.addEventListener('click', () => {
-    const willOpen = !section.classList.contains('open');
-    sections.forEach((s) => s.classList.remove('open'));
-    if (willOpen) section.classList.add('open');
-  });
+document.getElementById('accordion').addEventListener('click', (e) => {
+  const header = e.target.closest('.accordion-header');
+  if (!header) return;
+  const section = header.closest('.accordion-section');
+  if (section.classList.contains('locked')) return;
+
+  const willOpen = !section.classList.contains('open');
+  document.querySelectorAll('.accordion-section').forEach((s) => s.classList.remove('open'));
+  if (willOpen) section.classList.add('open');
 });
 
 // Sub-tabs inside the OCR section (placeholder switching, no content yet).
@@ -49,7 +50,7 @@ document.querySelectorAll('.doc-file').forEach((file) => {
     const docName = file.dataset.docName;
     const fileLabel = file.textContent;
     document.getElementById('preview-filename').textContent = `${docName} / ${fileLabel}`;
-
+    
   });
 });
 
@@ -95,7 +96,14 @@ document.querySelectorAll('.doc-file').forEach((file) => {
     currentDocId = file.dataset.docId;
     document.getElementById('reset-btn').style.display =
       file.dataset.hasBackup === 'true' ? 'flex' : 'none';
-  });
+    
+    document.getElementById('zoom-toolbar').style.display = 'flex';
+    zoomLevel = 1;
+    panX = 0;
+    panY = 0;
+    applyZoom();
+
+    });
 });
 
 function endCropMode() {
@@ -146,18 +154,42 @@ function getCookie(name) {
 }
 
 cropConfirmBtn.addEventListener('click', () => {
-  const imgRect = previewImage.getBoundingClientRect();
+  const elementRect = previewImage.getBoundingClientRect();
   const overlayRect = cropOverlay.getBoundingClientRect();
+
+  // Figure out the REAL visible image area inside the <img> box,
+  // accounting for object-fit: contain letterboxing
+  const naturalAspect = previewImage.naturalWidth / previewImage.naturalHeight;
+  const elementAspect = elementRect.width / elementRect.height;
+
+  let renderedWidth, renderedHeight, offsetX, offsetY;
+
+  if (naturalAspect > elementAspect) {
+    // image is letterboxed top/bottom
+    renderedWidth = elementRect.width;
+    renderedHeight = elementRect.width / naturalAspect;
+    offsetX = 0;
+    offsetY = (elementRect.height - renderedHeight) / 2;
+  } else {
+    // image is letterboxed left/right
+    renderedHeight = elementRect.height;
+    renderedWidth = elementRect.height * naturalAspect;
+    offsetX = (elementRect.width - renderedWidth) / 2;
+    offsetY = 0;
+  }
+
+  const visibleImageLeft = elementRect.left + offsetX;
+  const visibleImageTop = elementRect.top + offsetY;
 
   const boxLeft = parseFloat(cropBox.style.left);
   const boxTop = parseFloat(cropBox.style.top);
   const boxWidth = parseFloat(cropBox.style.width);
   const boxHeight = parseFloat(cropBox.style.height);
 
-  const imgOffsetX = imgRect.left - overlayRect.left;
-  const imgOffsetY = imgRect.top - overlayRect.top;
-  const scaleX = previewImage.naturalWidth / imgRect.width;
-  const scaleY = previewImage.naturalHeight / imgRect.height;
+  const imgOffsetX = visibleImageLeft - overlayRect.left;
+  const imgOffsetY = visibleImageTop - overlayRect.top;
+  const scaleX = previewImage.naturalWidth / renderedWidth;
+  const scaleY = previewImage.naturalHeight / renderedHeight;
 
   const sx = (boxLeft - imgOffsetX) * scaleX;
   const sy = (boxTop - imgOffsetY) * scaleY;
@@ -183,15 +215,15 @@ cropConfirmBtn.addEventListener('click', () => {
         if (data.success) {
           previewImage.src = data.new_url + '?t=' + Date.now();
           document.getElementById('reset-btn').style.display = 'flex';
+
+          zoomLevel = 1;
+          panX = 0;
+          panY = 0;
+          applyZoom();
         }
         endCropMode();
-
       });
-
-      
   }, 'image/png');
-
-  
 });
 
 // reset button
@@ -207,4 +239,92 @@ document.getElementById('reset-btn').addEventListener('click', () => {
         document.getElementById('reset-btn').style.display = 'none';
       }
     });
+});
+
+
+let zoomLevel = 1;
+let panX = 0;
+let panY = 0;
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+
+function applyZoom() {
+  previewImage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+}
+
+previewImage.addEventListener('mousedown', (e) => {
+  if (zoomLevel <= 1) return;
+  isPanning = true;
+  panStart = { x: e.clientX - panX, y: e.clientY - panY };
+  previewImage.style.cursor = 'grabbing';
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = e.clientX - panStart.x;
+  panY = e.clientY - panStart.y;
+  applyZoom();
+});
+
+document.addEventListener('mouseup', () => {
+  isPanning = false;
+  previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+});
+
+
+
+document.getElementById('zoom-in-btn').addEventListener('click', () => {
+  zoomLevel = Math.min(zoomLevel + 0.25, 3);
+  applyZoom();
+});
+
+document.getElementById('zoom-out-btn').addEventListener('click', () => {
+  zoomLevel = Math.max(zoomLevel - 0.25, 1);
+  applyZoom();
+});
+
+document.getElementById('zoom-reset-btn').addEventListener('click', () => {
+  zoomLevel = 1;
+  panX = 0;
+  panY = 0;
+  applyZoom();
+});
+
+
+// zoom 2 
+previewImage.addEventListener('dblclick', () => {
+  zoomLevel = Math.min(zoomLevel + 0.5, 3);
+  applyZoom();
+});
+
+let pinchStartDistance = null;
+let pinchStartZoom = 1;
+
+function getTouchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+
+previewImage.addEventListener('wheel', (e) => {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    const delta = -e.deltaY * 0.01;
+    zoomLevel = Math.min(Math.max(zoomLevel + delta, 1), 3);
+    applyZoom();
+  }
+}, { passive: false });
+
+
+// 
+document.getElementById('next-step-btn').addEventListener('click', () => {
+  const preprocessingSection = document.querySelector('[data-section="preprocessing"]');
+
+  preprocessingSection.classList.remove('locked');
+  preprocessingSection.classList.add('active-step');
+
+  document.querySelectorAll('.accordion-section').forEach((s) => s.classList.remove('open'));
+  preprocessingSection.classList.add('open');
+  preprocessingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });

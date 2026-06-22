@@ -59,7 +59,7 @@ nav {
 .workspace {
   display: grid;
   /* grid-template-columns:  220px 6px 50fr 35fr; */
-  grid-template-columns: 220px 6px 1fr 580px;
+  grid-template-columns: 280px 6px 1fr 580px;
   height: calc(100vh - 56px);
 }
 
@@ -91,11 +91,11 @@ nav {
   padding: 0 4px;
 }
 
-.doc-list { display: flex; flex-direction: column; gap: 8px;   color: var(--ink); }
+.doc-list { display: flex; flex-direction: column; gap: 4px;   color: var(--ink); }
 
 .doc-group {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 2px;
   overflow: hidden;
   background: var(--bg);
   color: var(--ink);
@@ -196,6 +196,8 @@ nav {
   font-weight: 500;
   letter-spacing: 0.02em;
   overflow: hidden;
+  position: relative;
+  padding-top: 38px;
 }
 
 .preview-bar {
@@ -204,12 +206,19 @@ nav {
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--line);
-  color: var(--ink-faint);
+  background-color: var(--panel-bg);
   flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+
 }
 
 #preview-filename {
-  font-size: 12.5px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--ink-soft);
   overflow: hidden;
@@ -217,7 +226,7 @@ nav {
   white-space: nowrap;
 }
 
-.preview-card { position: relative; }
+
 
 .preview-bar-actions {
   margin-left: auto;
@@ -277,14 +286,21 @@ nav {
 }
 .accordion-header:hover { background: var(--panel-bg); }
 
-.status-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--ink-faint);
-  flex: 0 0 auto;
+.accordion-section {
+  border-bottom: 1px solid var(--line);
 }
-.status-dot.done { background: var(--success); }
-.status-dot.locked { background: var(--line-strong); }
+
+.accordion-section.active-step .accordion-header {
+  background: var(--panel-bg);
+}
+
+.accordion-section.active-step .accordion-header:hover {
+  background: var(--accent-soft);
+}
+
+.accordion-section.done .accordion-header {
+  background: var(--success-soft);
+}
 
 .accordion-title {
   flex: 1;
@@ -296,6 +312,8 @@ nav {
 .accordion-section.locked .accordion-title { color: var(--ink-faint); }
 .accordion-section.locked .accordion-header { cursor: not-allowed; }
 .accordion-section.locked:hover .accordion-header { background: var(--bg); }
+.accordion-section.locked .accordion-header { pointer-events: none; }
+
 
 .accordion-chevron {
   width: 18px; height: 18px;
@@ -445,4 +463,62 @@ nav {
 .doc-delete-btn:hover { color: var(--accent); }
 .doc-delete-btn svg { width: 14px; height: 14px; }
 
+
+.zoom-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  background: rgba(35,35,37,0.85);
+  border-radius: 9px;
+  padding: 4px;
+}
+
+.zoom-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #F1F1F1;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.zoom-btn:hover { background: rgba(255,255,255,0.12); }
+.zoom-btn svg { width: 16px; height: 16px; }
+
+
+#preview-image {
+  cursor: default;
+}
+
+
+.toolbar-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.2);
+  margin: 4px 2px;
+}
+
+.zoom-btn.confirm { color: #7FD68A; }
+.zoom-btn.cancel { color: #E89B7D; }
+
+.btn-next-bar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-next-bar:hover { background: var(--accent); }
+.btn-next-bar svg { width: 13px; height: 13px; }
 
