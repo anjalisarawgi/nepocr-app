@@ -127,7 +127,9 @@
 
       <div class="accordion" id="accordion">
 
-        <div class="accordion-section locked" data-section="preprocessing">
+        <div class="accordion-section {% if selected_doc.status == 'uploaded' %}locked{% else %}active-step open{% endif %}" data-section="preprocessing">
+
+
           <div class="accordion-header">
             <span class="accordion-title">Step 1: Image Cleaning</span>
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>

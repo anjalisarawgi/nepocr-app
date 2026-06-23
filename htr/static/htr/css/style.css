@@ -59,7 +59,7 @@ nav {
 .workspace {
   display: grid;
   /* grid-template-columns:  220px 6px 50fr 35fr; */
-  grid-template-columns: 280px 6px 1fr 580px;
+  grid-template-columns: 280px 6px 1fr 700px;
   height: calc(100vh - 56px);
 }
 

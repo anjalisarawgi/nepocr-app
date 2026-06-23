@@ -45,7 +45,7 @@ document.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
   const newWidth = Math.min(Math.max(e.clientX, 160), 480); // clamp between 160px and 480px
   // workspace.style.gridTemplateColumns = `${newWidth}px 6px 50fr 40fr`;
-  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 580px`;
+  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 700px`;
 
 
 });
@@ -175,15 +175,10 @@ cropConfirmBtn.addEventListener('click', () => {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          previewImage.src = data.new_url + '?t=' + Date.now();
-          document.getElementById('reset-btn').style.display = 'flex';
-
-          zoomLevel = 1;
-          panX = 0;
-          panY = 0;
-          applyZoom();
+          location.reload();
+        } else {
+          endCropMode();
         }
-        endCropMode();
       });
   }, 'image/png');
 });
@@ -197,11 +192,10 @@ document.getElementById('reset-btn').addEventListener('click', () => {
     .then((res) => res.json())
     .then((data) => {
       if (data.success) {
-        previewImage.src = data.new_url + '?t=' + Date.now();
-        document.getElementById('reset-btn').style.display = 'none';
+        location.reload();
       }
     });
-});
+})
 
 
 let zoomLevel = 1;
@@ -281,12 +275,14 @@ previewImage.addEventListener('wheel', (e) => {
 
 // 
 document.getElementById('next-step-btn').addEventListener('click', () => {
-  const preprocessingSection = document.querySelector('[data-section="preprocessing"]');
-
-  preprocessingSection.classList.remove('locked');
-  preprocessingSection.classList.add('active-step');
-
-  document.querySelectorAll('.accordion-section').forEach((s) => s.classList.remove('open'));
-  preprocessingSection.classList.add('open');
-  preprocessingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  fetch(`/advance/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
 });

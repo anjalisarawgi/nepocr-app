@@ -9,6 +9,8 @@ urlpatterns =[
     path('delete/<int:pk>/', views.delete_image, name='delete_image'),
     path('crop/<int:pk>/', views.crop_image, name='crop_image'),
     path('reset/<int:pk>/', views.reset_image, name='reset_image'),
-    path('image/<int:pk>/', views.upload_image, name='view_image')
-]
+    path('image/<int:pk>/', views.upload_image, name='view_image'),
+    path('advance/<int:pk>/', views.advance_to_preprocessing, name='advance_to_preprocessing'),
+
+]   
 #
