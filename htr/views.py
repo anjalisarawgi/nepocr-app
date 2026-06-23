@@ -34,7 +34,7 @@ def logout_view(request):
 
 
 @login_required
-def upload_image(request):
+def upload_image(request, pk = None):
     if request.method == 'POST':
         form = ImageUploadForm(request.POST, request.FILES) # POST contains the form fields eg text, checkboxes adn FILES contains the uploaded files
         if form.is_valid(): # checks if valid, and if not, go to else and if yes, save it to the database and redirect to the preprocess page
@@ -47,8 +47,13 @@ def upload_image(request):
 
     documents = UploadedImage.objects.filter(user = request.user).order_by('-uploaded_at')
 
+    # for the image / id url
+    selected_doc = None
+    if pk:
+        selected_doc = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
     
-    return render(request, 'htr/main_page.html', {'form': form, 'documents': documents,}) # page 1  = upload page  # 
+    return render(request, 'htr/main_page.html', {'form': form, 'documents': documents, 'selected_doc': selected_doc}) # page 1  = upload page  # 
 
 
     

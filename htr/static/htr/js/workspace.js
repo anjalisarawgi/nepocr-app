@@ -1,3 +1,5 @@
+
+
 // Exclusive accordion: opening one section closes the others.
 document.getElementById('accordion').addEventListener('click', (e) => {
   const header = e.target.closest('.accordion-header');
@@ -26,33 +28,8 @@ document.querySelectorAll('.export-chip').forEach((chip) => {
   chip.addEventListener('click', () => chip.classList.toggle('checked'));
 });
 
-// Toggle each document's file dropdown
-document.querySelectorAll('.doc-item').forEach((header) => {
-  header.addEventListener('click', () => {
-    header.closest('.doc-group').classList.toggle('open');
-  });
-});
 
-// Clicking an actual file shows it in the preview
-document.querySelectorAll('.doc-file').forEach((file) => {
-  file.addEventListener('click', (e) => {
-    e.stopPropagation();
-    document.querySelectorAll('.doc-file').forEach((f) => f.classList.remove('active'));
-    file.classList.add('active');
 
-    const url = file.dataset.imageUrl;
-    document.getElementById('preview-placeholder').style.display = 'none';
-    const img = document.getElementById('preview-image');
-    img.src = url;
-    img.style.display = 'block';
-
-    document.getElementById('preview-bar').style.display = 'flex';
-    const docName = file.dataset.docName;
-    const fileLabel = file.textContent;
-    document.getElementById('preview-filename').textContent = `${docName} / ${fileLabel}`;
-    
-  });
-});
 
 // Resizable sidebar
 const handle = document.getElementById('resize-handle');
@@ -80,7 +57,7 @@ document.addEventListener('mouseup', () => {
 
 
 ////// crop //
-let currentDocId = null;
+
 let cropStart = null;
 
 const cropBtn = document.getElementById('crop-btn');
@@ -90,21 +67,6 @@ const cropOverlay = document.getElementById('crop-overlay');
 const cropBox = document.getElementById('crop-box');
 const previewImage = document.getElementById('preview-image');
 
-// remember which document is currently shown, whenever one is clicked
-document.querySelectorAll('.doc-file').forEach((file) => {
-  file.addEventListener('click', () => {
-    currentDocId = file.dataset.docId;
-    document.getElementById('reset-btn').style.display =
-      file.dataset.hasBackup === 'true' ? 'flex' : 'none';
-    
-    document.getElementById('zoom-toolbar').style.display = 'flex';
-    zoomLevel = 1;
-    panX = 0;
-    panY = 0;
-    applyZoom();
-
-    });
-});
 
 function endCropMode() {
   cropOverlay.style.display = 'none';
