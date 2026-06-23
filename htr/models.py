@@ -26,7 +26,7 @@ class UploadedImage(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default = "uploaded")
     locked_image = models.ImageField(upload_to="locked/", blank=True, null=True)
-
+    preprocessing_settings = models.JSONField(default=dict, blank=True)
 
     @property
     def filename(self):

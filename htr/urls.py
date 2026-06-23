@@ -11,6 +11,10 @@ urlpatterns =[
     path('reset/<int:pk>/', views.reset_image, name='reset_image'),
     path('image/<int:pk>/', views.upload_image, name='view_image'),
     path('advance/<int:pk>/', views.advance_to_preprocessing, name='advance_to_preprocessing'),
+    # path('gaussian/<int:pk>/', views.apply_gaussian, name='apply_gaussian'),
+    path('preprocess/<int:pk>/', views.apply_preprocessing, name='apply_preprocessing'),
+
+
 
 ]   
 #

@@ -105,3 +105,90 @@ def advance_to_preprocessing(request, pk):
         image.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
+
+
+from skimage.filters import threshold_sauvola
+
+@login_required
+def apply_preprocessing(request, pk):
+    if request.method == "POST":
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
+        gaussian_on = request.POST.get('gaussian') == 'true'
+        clahe_on = request.POST.get('clahe') == 'true'
+        sauvola_on = request.POST.get('sauvola') == 'true'
+        opening_on = request.POST.get('opening') == 'true'
+
+        if not any([gaussian_on, clahe_on, sauvola_on, opening_on]):
+            image.processed.delete(save=True)
+            image.preprocessing_settings = {}
+            image.processed.delete(save=True)
+            return JsonResponse({'success': True, 'new_url': image.locked_image.url})
+
+        kernel_size = int(request.POST.get('kernel_size', 201))
+        sigma = int(request.POST.get('sigma', 201))
+        clip_limit = float(request.POST.get('clip_limit', 2.0))
+        tile_size = int(request.POST.get('tile_size', 8))
+        window_size = int(request.POST.get('window_size', 25))
+        k = float(request.POST.get('k', 0.2))
+        opening_size = int(request.POST.get('opening_size', 3))
+
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        if window_size % 2 == 0:
+            window_size += 1
+
+        image.locked_image.open()
+        file_bytes = np.frombuffer(image.locked_image.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+        if gaussian_on:
+            image_float = img.astype(np.float32)
+            background = cv2.GaussianBlur(image_float, (kernel_size, kernel_size), sigmaX=sigma)
+            normalized = np.clip(image_float / background * 255, 0, 255).astype(np.uint8)
+            img = cv2.GaussianBlur(normalized, (3, 3), 0)
+
+        if clahe_on:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_size, tile_size))
+            equalized = clahe.apply(gray)
+            img = cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+
+        if sauvola_on:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            thresh = threshold_sauvola(gray, window_size=window_size, k=k)
+            binary = (gray > thresh).astype(np.uint8) * 255
+            img = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+
+        if opening_on:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            inverted = cv2.bitwise_not(gray)
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (opening_size, opening_size))
+
+            opened = cv2.morphologyEx(inverted, cv2.MORPH_OPEN, kernel)
+            img = cv2.bitwise_not(opened)
+
+        success, buffer = cv2.imencode('.jpg', img)
+        content = ContentFile(buffer.tobytes())
+        
+
+        image.preprocessing_settings = {
+            'gaussian': gaussian_on,
+            'clahe': clahe_on,
+            'sauvola': sauvola_on,
+            'opening': opening_on,
+            'kernel_size': kernel_size,
+            'sigma': sigma,
+            'clip_limit': clip_limit,
+            'tile_size': tile_size,
+            'window_size': window_size,
+            'k': k,
+            'opening_size': opening_size,
+        }
+        
+        image.processed.save(image.filename, content, save=True)
+
+        return JsonResponse({'success': True, 'new_url': image.processed.url})
+
+    return JsonResponse({'success': False})

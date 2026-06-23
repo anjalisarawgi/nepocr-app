@@ -30,15 +30,17 @@
         {% for doc in documents %}
         <div class="doc-item-wrapper">
           <a href="{% url 'view_image' doc.id %}"
-             class="doc-item {% if selected_doc.id == doc.id %}active{% endif %}"
-             data-has-backup="{% if doc.original_backup %}true{% else %}false{% endif %}">
-            <svg class="doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <span class="doc-name">{{ doc.filename }}</span>
-            <span class="doc-updated">{{ doc.updated_at|timesince }} ago</span>
-          </a>
+          class="doc-item {% if selected_doc.id == doc.id %}active{% endif %}"
+          data-has-backup="{% if doc.original_backup %}true{% else %}false{% endif %}">
+         <svg class="doc-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+           <polyline points="14 2 14 8 20 8"/>
+         </svg>
+         <span class="doc-text">
+           <span class="doc-name">{{ doc.filename }}</span>
+           <span class="doc-updated">{{ doc.updated_at }}</span>
+         </span>
+       </a>
           <form method="post" action="{% url 'delete_image' doc.id %}" class="delete-form" onsubmit="return confirm('Delete this document?');">
             {% csrf_token %}
             <button type="submit" class="doc-delete-btn">
@@ -70,8 +72,18 @@
     <!-- Preview -->
     <section class="preview-panel">
       <div class="preview-card" id="preview-card">
+        <div id="processing-overlay" class="processing-overlay" style="display:none;">
+          <div class="spinner"></div>
+          <span>Processing...</span>
+        </div>
         <div class="preview-bar" id="preview-bar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
           <span id="preview-filename">{% if selected_doc %}{{ selected_doc.filename }}{% endif %}</span>
+
+          <div class="before-after-toggle" id="before-after-toggle" style="display: {% if selected_doc.processed %}flex{% else %}none{% endif %};">
+            <button class="ba-btn active" id="before-btn" data-mode="before">Before</button>
+            <button class="ba-btn" id="after-btn" data-mode="after">After</button>
+          </div>
+
           <button id="next-step-btn" class="btn-next-bar">
             Next:
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -80,8 +92,8 @@
 
         <span id="preview-placeholder" style="display: {% if selected_doc %}none{% else %}block{% endif %};">Preview</span>
         <img id="preview-image"
-             src="{% if selected_doc %}{{ selected_doc.original_image.url }}{% endif %}"
-             style="display: {% if selected_doc %}block{% else %}none{% endif %}; width: 100%; height: 100%; object-fit: contain;">
+            src="{% if selected_doc.processed %}{{ selected_doc.processed.url }}{% elif selected_doc.locked_image %}{{ selected_doc.locked_image.url }}{% elif selected_doc %}{{ selected_doc.original_image.url }}{% endif %}"
+            style="display: {% if selected_doc %}block{% else %}none{% endif %}; width: 100%; height: 100%; object-fit: contain;">
         <div id="crop-overlay" class="crop-overlay" style="display:none;">
           <div id="crop-box" class="crop-box"></div>
         </div>
@@ -137,18 +149,95 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Adjust the image before segmentation.</p>
-                <label class="option-card checked">
-                  <input type="checkbox" checked>
+                <p class="placeholder-text">Image cleaning methods: you can choose one or more as preffered.</p>
+                <label class="option-card {% if selected_doc.preprocessing_settings.gaussian %}checked{% endif %}" id = "gaussian-card">
+                  <input type="checkbox" id="gaussian-checkbox" {% if selected_doc.preprocessing_settings.gaussian %}checked{% endif %}>
                   <span class="checkbox-box">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   </span>
                   <span class="option-text">
                     <span class="option-title">Gaussian normalization</span>
-                    <span class="option-desc">Smooths uneven lighting and background noise.</span>
+                    <span class="option-desc">It tries to clean the background texture of the image so that the noise can be cleaned.</span>
+                
+                    <div class="slider-row" id="kernel-slider-row" style="display: {% if selected_doc.preprocessing_settings.gaussian %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Kernel size</span>
+                      <input type="range" id="kernel-slider" min="3" max="401" step="2" value="{{ selected_doc.preprocessing_settings.kernel_size|default:201 }}">
+                      <span class="slider-value" id="kernel-value">{{ selected_doc.preprocessing_settings.kernel_size|default:201 }}</span>
+                    </div>
+                
+                    <div class="slider-row" id="sigma-slider-row" style="display: {% if selected_doc.preprocessing_settings.gaussian %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Sigma</span>
+                      <input type="range" id="sigma-slider" min="1" max="401" step="1" value="{{ selected_doc.preprocessing_settings.sigma|default:201 }}">
+                      <span class="slider-value" id="sigma-value">{{ selected_doc.preprocessing_settings.sigma|default:201 }}</span>
+                    </div>
                   </span>
                 </label>
-                <button class="btn-primary" type="button" id="run-segmentation-btn">Step 2: Line Segmentation</button>
+
+
+                <label class="option-card {% if selected_doc.preprocessing_settings.sauvola %}checked{% endif %}" id="sauvola-card">
+                  <input type="checkbox" id="sauvola-checkbox" {% if selected_doc.preprocessing_settings.sauvola %}checked{% endif %}>
+                  <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span class="option-text">
+                    <span class="option-title">Sauvola binarization</span>
+                    <span class="option-desc">Converts to black-and-white text. Note: this is very good for dark regions, but is harsh for light regions.</span>
+                
+                    <div class="slider-row" id="window-slider-row" style="display: {% if selected_doc.preprocessing_settings.sauvola %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Window size</span>
+                      <input type="range" id="window-slider" min="3" max="101" step="2" value="{{ selected_doc.preprocessing_settings.window_size|default:25 }}">
+                      <span class="slider-value" id="window-value">{{ selected_doc.preprocessing_settings.window_size|default:25 }}</span>
+                    </div>
+                
+                    <div class="slider-row" id="k-slider-row" style="display: {% if selected_doc.preprocessing_settings.sauvola %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">k</span>
+                      <input type="range" id="k-slider" min="0" max="100" step="1" value="{{ selected_doc.preprocessing_settings.k_slider_value|default:20 }}">
+                      <span class="slider-value" id="k-value">{{ selected_doc.preprocessing_settings.k|default:0.2 }}</span>
+                    </div>
+                  </span>
+                </label>
+
+                <label class="option-card {% if selected_doc.preprocessing_settings.clahe %}checked{% endif %}" id="clahe-card">
+                  <input type="checkbox" id="clahe-checkbox" {% if selected_doc.preprocessing_settings.clahe %}checked{% endif %}>
+                  <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span class="option-text">
+                    <span class="option-title">CLAHE lighting correction</span>
+                    <span class="option-desc">Boosts local contrast to reveal faint ink in shadowed areas.</span>
+                
+                    <div class="slider-row" id="clip-slider-row" style="display: {% if selected_doc.preprocessing_settings.clahe %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Clip limit</span>
+                      <input type="range" id="clip-slider" min="1" max="100" step="1" value="{{ selected_doc.preprocessing_settings.clip_slider_value|default:20 }}">
+                      <span class="slider-value" id="clip-value">{{ selected_doc.preprocessing_settings.clip_limit|default:2.0 }}</span>
+                    </div>
+                
+                    <div class="slider-row" id="tile-slider-row" style="display: {% if selected_doc.preprocessing_settings.clahe %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Tile size</span>
+                      <input type="range" id="tile-slider" min="2" max="32" step="1" value="{{ selected_doc.preprocessing_settings.tile_size|default:8 }}">
+                      <span class="slider-value" id="tile-value">{{ selected_doc.preprocessing_settings.tile_size|default:8 }}</span>
+                    </div>
+                  </span>
+                </label>
+                
+                <label class="option-card {% if selected_doc.preprocessing_settings.opening %}checked{% endif %}" id="opening-card">
+                  <input type="checkbox" id="opening-checkbox" {% if selected_doc.preprocessing_settings.opening %}checked{% endif %}>
+                  <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span class="option-text">
+                    <span class="option-title">Morphological opening</span>
+                    <span class="option-desc">Removes small specks of noise without distorting strokes.</span>
+                
+                    <div class="slider-row" id="opening-slider-row" style="display: {% if selected_doc.preprocessing_settings.opening %}flex{% else %}none{% endif %};">
+                      <span class="slider-label">Kernel size</span>
+                      <input type="range" id="opening-slider" min="1" max="15" step="2" value="{{ selected_doc.preprocessing_settings.opening_size|default:3 }}">
+                      <span class="slider-value" id="opening-value">{{ selected_doc.preprocessing_settings.opening_size|default:3 }}</span>
+                    </div>
+                  </span>
+                </label>
+
+                <button class="btn-primary" type="button" id="run-segmentation-btn">Next: Line Segmentation</button>
               </div>
             </div>
           </div>
@@ -198,7 +287,9 @@
   </div>
 
   <script>
-    let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
+      let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
+      let lockedImageUrl = {% if selected_doc.locked_image %}"{{ selected_doc.locked_image.url }}"{% else %}null{% endif %};
+      let processedImageUrl = {% if selected_doc.processed %}"{{ selected_doc.processed.url }}"{% else %}null{% endif %};
   </script>
   <script src="{% static 'htr/js/workspace.js' %}"></script>
   <script>

@@ -45,7 +45,7 @@ document.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
   const newWidth = Math.min(Math.max(e.clientX, 160), 480); // clamp between 160px and 480px
   // workspace.style.gridTemplateColumns = `${newWidth}px 6px 50fr 40fr`;
-  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 700px`;
+  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 600px`;
 
 
 });
@@ -286,3 +286,142 @@ document.getElementById('next-step-btn').addEventListener('click', () => {
       }
     });
 });
+
+
+
+// // gaussian
+//
+const gaussianCheckbox = document.getElementById('gaussian-checkbox');
+const sauvolaCheckbox = document.getElementById('sauvola-checkbox');
+
+const kernelSlider = document.getElementById('kernel-slider');
+const sigmaSlider = document.getElementById('sigma-slider');
+const kernelValue = document.getElementById('kernel-value');
+const sigmaValue = document.getElementById('sigma-value');
+const kernelRow = document.getElementById('kernel-slider-row');
+const sigmaRow = document.getElementById('sigma-slider-row');
+
+const windowSlider = document.getElementById('window-slider');
+const kSlider = document.getElementById('k-slider');
+const windowValue = document.getElementById('window-value');
+const kValue = document.getElementById('k-value');
+const windowRow = document.getElementById('window-slider-row');
+const kRow = document.getElementById('k-slider-row');
+
+const clahecheckbox = document.getElementById('clahe-checkbox');
+const clipSlider = document.getElementById('clip-slider');
+const tileSlider = document.getElementById('tile-slider');
+const clipValue = document.getElementById('clip-value');
+const tileValue = document.getElementById('tile-value');
+const clipRow = document.getElementById('clip-slider-row');
+const tileRow = document.getElementById('tile-slider-row');
+
+const openingCheckbox = document.getElementById('opening-checkbox');
+const openingSlider = document.getElementById('opening-slider');
+const openingValue = document.getElementById('opening-value');
+const openingRow = document.getElementById('opening-slider-row');
+
+function runPreprocessing() {
+  document.getElementById('processing-overlay').style.display = 'flex';
+
+  const formData = new FormData();
+  formData.append('gaussian', gaussianCheckbox.checked ? 'true' : 'false');
+  formData.append('clahe', clahecheckbox.checked ? 'true' : 'false');
+  formData.append('sauvola', sauvolaCheckbox.checked ? 'true' : 'false');
+  formData.append('opening', openingCheckbox.checked ? 'true' : 'false');
+
+  formData.append('kernel_size', kernelSlider.value);
+  formData.append('sigma', sigmaSlider.value);
+  formData.append('clip_limit', clipSlider.value / 10);
+  formData.append('tile_size', tileSlider.value);
+  formData.append('window_size', windowSlider.value);
+  formData.append('k', kSlider.value / 100);
+  formData.append('opening_size', openingSlider.value);
+
+  fetch(`/preprocess/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    body: formData,
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        afterUrl = data.new_url + '?t=' + Date.now();
+        beforeAfterToggle.style.display = 'flex';
+        setMode('after');
+      }
+    })
+    .finally(() => {
+      document.getElementById('processing-overlay').style.display = 'none';
+    });
+}
+
+
+let sliderDebounce;
+function debouncedRun() {
+  clearTimeout(sliderDebounce);
+  sliderDebounce = setTimeout(runPreprocessing, 300);
+}
+
+gaussianCheckbox.addEventListener('change', () => {
+  gaussianCheckbox.closest('.option-card').classList.toggle('checked', gaussianCheckbox.checked);
+  kernelRow.style.display = gaussianCheckbox.checked ? 'flex' : 'none';
+  sigmaRow.style.display = gaussianCheckbox.checked ? 'flex' : 'none';
+  runPreprocessing();
+});
+
+sauvolaCheckbox.addEventListener('change', () => {
+  sauvolaCheckbox.closest('.option-card').classList.toggle('checked', sauvolaCheckbox.checked);
+  windowRow.style.display = sauvolaCheckbox.checked ? 'flex' : 'none';
+  kRow.style.display = sauvolaCheckbox.checked ? 'flex' : 'none';
+  runPreprocessing();
+});
+
+clahecheckbox.addEventListener('change', () => {
+  clahecheckbox.closest('.option-card').classList.toggle('checked', clahecheckbox.checked);
+  clipRow.style.display = clahecheckbox.checked ? 'flex' : 'none';
+  tileRow.style.display = clahecheckbox.checked ? 'flex' : 'none';
+  runPreprocessing();
+});
+
+openingCheckbox.addEventListener('change', () => {
+  openingCheckbox.closest('.option-card').classList.toggle('checked', openingCheckbox.checked);
+  openingRow.style.display = openingCheckbox.checked ? 'flex' : 'none';
+  runPreprocessing();
+});
+
+
+kernelSlider.addEventListener('input', () => { kernelValue.textContent = kernelSlider.value; debouncedRun(); });
+sigmaSlider.addEventListener('input', () => { sigmaValue.textContent = sigmaSlider.value; debouncedRun(); });
+windowSlider.addEventListener('input', () => { windowValue.textContent = windowSlider.value; debouncedRun(); });
+kSlider.addEventListener('input', () => { kValue.textContent = (kSlider.value / 100).toFixed(2); debouncedRun(); });
+clipSlider.addEventListener('input', () => { clipValue.textContent = (clipSlider.value / 10).toFixed(1); debouncedRun(); });
+tileSlider.addEventListener('input', () => { tileValue.textContent = tileSlider.value; debouncedRun(); });
+openingSlider.addEventListener('input', () => { openingValue.textContent = openingSlider.value; debouncedRun(); });
+
+
+
+// toggle for before after
+const beforeAfterToggle = document.getElementById('before-after-toggle');
+const beforeBtn = document.getElementById('before-btn');
+const afterBtn = document.getElementById('after-btn');
+
+let beforeUrl = lockedImageUrl;
+let afterUrl = processedImageUrl;
+
+
+if (afterUrl) {
+  beforeAfterToggle.style.display = 'flex';
+}
+
+
+function setMode(mode) {
+  beforeBtn.classList.toggle('active', mode === 'before');
+  afterBtn.classList.toggle('active', mode === 'after');
+  previewImage.src = mode === 'before' ? beforeUrl : afterUrl;
+
+
+}
+
+beforeBtn.addEventListener('click', () => setMode('before'));
+afterBtn.addEventListener('click', () => setMode('after'));
