@@ -78,7 +78,17 @@
         </div>
         <div class="preview-bar" id="preview-bar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
           <span id="preview-filename">{% if selected_doc %}{{ selected_doc.filename }}{% endif %}</span>
-        
+          <div class="overlay-toggle-group" id="overlay-toggle-group" style="display:none;">
+            <label class="overlay-toggle">
+              <input type="checkbox" id="show-polygons-checkbox" checked>
+              <span>Polygons</span>
+            </label>
+            <label class="overlay-toggle">
+              <input type="checkbox" id="show-baselines-checkbox" checked>
+              <span>Baselines</span>
+            </label>
+          </div>
+          
           <button id="delete-line-btn" class="btn-delete-line" style="display:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
@@ -90,7 +100,7 @@
           </button>
           
           
-        
+          
           <div class="before-after-toggle" id="before-after-toggle" style="display: {% if selected_doc.processed %}flex{% else %}none{% endif %};">
             <button class="ba-btn active" id="before-btn" data-mode="before">Before</button>
             <button class="ba-btn" id="after-btn" data-mode="after">After</button>

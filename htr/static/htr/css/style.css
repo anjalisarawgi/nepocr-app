@@ -59,7 +59,7 @@ nav {
 .workspace {
   display: grid;
   /* grid-template-columns:  220px 6px 50fr 35fr; */
-  grid-template-columns: 280px 6px 1fr 600px;
+  grid-template-columns: 280px 6px 1fr 500px;
   height: calc(100vh - 56px);
 }
 
@@ -665,3 +665,22 @@ nav {
 .btn-delete-line:hover { background: var(--accent-soft); }
 .btn-delete-line svg { width: 13px; height: 13px; }
 
+.overlay-toggle-group {
+  display: flex;
+  gap: 12px;
+  margin-right: 10px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.overlay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.overlay-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}

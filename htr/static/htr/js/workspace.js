@@ -45,7 +45,7 @@ document.addEventListener('mousemove', (e) => {
   if (!isDragging) return;
   const newWidth = Math.min(Math.max(e.clientX, 160), 480); // clamp between 160px and 480px
   // workspace.style.gridTemplateColumns = `${newWidth}px 6px 50fr 40fr`;
-  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 600px`;
+  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 500px`;
 
 
 });
@@ -460,6 +460,14 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
 let segmentationLines = [];
 let selectedLineIndex = null;
 let overlayPageWidth, overlayPageHeight;
+let showPolygons = true;
+let showBaselines = true;
+
+function getOverlayScale() {
+  const referenceWidth = 1500;
+  return overlayPageWidth / referenceWidth;
+}
+
 
 function drawLineOverlay(lines, pageWidth, pageHeight) {
   segmentationLines = lines.map(l => ({
@@ -469,108 +477,118 @@ function drawLineOverlay(lines, pageWidth, pageHeight) {
   selectedLineIndex = null;
   overlayPageWidth = pageWidth;
   overlayPageHeight = pageHeight;
+  document.getElementById('overlay-toggle-group').style.display = 'flex';
   renderOverlay();
 }
+
 
 function renderOverlay() {
   const svg = document.getElementById('line-overlay');
   svg.setAttribute('viewBox', `0 0 ${overlayPageWidth} ${overlayPageHeight}`);
   svg.innerHTML = '';
   svg.style.display = segmentationLines.length ? 'block' : 'none';
+  const scale = getOverlayScale();
+
+
 
   segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
-  
-    const polygonHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    polygonHalo.setAttribute('points', points);
-    polygonHalo.setAttribute('fill', 'none');
-    polygonHalo.setAttribute('stroke', '#ffffff');
-    polygonHalo.setAttribute('stroke-width', index === selectedLineIndex ? '8' : '7');
-    polygonHalo.setAttribute('stroke-opacity', '0.6');
-    polygonHalo.style.pointerEvents = 'none';
-    svg.appendChild(polygonHalo);
-    
-    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    polygon.setAttribute('points', points);
-    polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
-    polygon.setAttribute('stroke', '#191919');
-    polygon.setAttribute('stroke-width', index === selectedLineIndex ? '4' : '0');
 
-    polygon.style.pointerEvents = 'auto';
-    polygon.style.cursor = 'pointer';
-    polygon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectedLineIndex = index;
-      renderOverlay();
-    });
-    svg.appendChild(polygon);
-  
-    if (line.baseline && line.baseline.length > 0) {
+    if (showPolygons) {
+      const polygonHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      polygonHalo.setAttribute('points', points);
+      polygonHalo.setAttribute('fill', 'none');
+      polygonHalo.setAttribute('stroke', '#ffffff');
+      polygonHalo.setAttribute('stroke-width', (index === selectedLineIndex ? 8 : 7) * scale);
+      polygonHalo.setAttribute('stroke-opacity', '0.6');
+      polygonHalo.style.pointerEvents = 'none';
+      svg.appendChild(polygonHalo);
+
+      const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      polygon.setAttribute('points', points);
+      polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
+      polygon.setAttribute('stroke', '#1E5AC8');
+      polygon.setAttribute('stroke-width', (index === selectedLineIndex ? 4 : 0) * scale);
+      polygon.style.pointerEvents = 'auto';
+      polygon.style.cursor = 'pointer';
+      polygon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedLineIndex = index;
+        renderOverlay();
+      });
+      svg.appendChild(polygon);
+    }
+
+    if (showBaselines && line.baseline && line.baseline.length > 0) {
       const baselinePoints = line.baseline.map(p => p.join(',')).join(' ');
-  
+
       const baselineHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       baselineHalo.setAttribute('points', baselinePoints);
       baselineHalo.setAttribute('fill', 'none');
       baselineHalo.setAttribute('stroke', '#ffffff');
-      baselineHalo.setAttribute('stroke-width', '6');
+      baselineHalo.setAttribute('stroke-width', 6 * scale);
       baselineHalo.setAttribute('stroke-opacity', '0.55');
       baselineHalo.style.pointerEvents = 'none';
       svg.appendChild(baselineHalo);
-      
+
       const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       baseline.setAttribute('points', baselinePoints);
       baseline.setAttribute('fill', 'none');
-      baseline.setAttribute('stroke', '#7E22CE');
-      baseline.setAttribute('stroke-width', '6');
-      // baseline.setAttribute('stroke-dasharray', '8 5');
+      baseline.setAttribute('stroke', '#7A1230');
+      baseline.setAttribute('stroke-width', 5 * scale);
+      baseline.setAttribute('stroke-dasharray', `${8 * scale} ${5 * scale}`);
       baseline.style.pointerEvents = 'none';
       svg.appendChild(baseline);
     }
   });
 
-if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
-  segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
-    const size = 25;
-    const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    square.setAttribute('x', point[0] - size / 2);
-    square.setAttribute('y', point[1] - size / 2);
-    square.setAttribute('width', size);
-    square.setAttribute('height', size);
-    square.setAttribute('fill', 'rgba(255,255,255,0.85)');
-    square.setAttribute('stroke', '#191919');
-    square.setAttribute('stroke-width', '4');
-    square.style.pointerEvents = 'auto';
-    square.style.cursor = 'grab';
-    square.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'polygon'));
-    svg.appendChild(square);
-  });
+  if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
+    if (showPolygons) {
+      segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
+        const size = 16 * scale;
+        const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        square.setAttribute('x', point[0] - size / 2);
+        square.setAttribute('y', point[1] - size / 2);
+        square.setAttribute('width', size);
+        square.setAttribute('height', size);
+        square.setAttribute('fill', 'rgba(255,255,255,0.85)');
+        square.setAttribute('stroke', '#1E5AC8');
+        square.setAttribute('stroke-width', 2.5 * scale);
+        square.style.pointerEvents = 'auto';
+        square.style.cursor = 'grab';
+        square.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'polygon'));
+        svg.appendChild(square);
+      });
+    }
 
-  const baselinePoints = segmentationLines[selectedLineIndex].baseline;
-  const showEvery = baselinePoints.length > 15 ? 2 : 1;
+    if (showBaselines) {
+      const baselinePoints = segmentationLines[selectedLineIndex].baseline;
+      const showEvery = baselinePoints.length > 15 ? 2 : 1;
 
-  baselinePoints.forEach((point, vIndex) => {
-    if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
-  
-    const width = 30;
-    const height = 30;
-    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rect.setAttribute('x', point[0] - width / 2);
-    rect.setAttribute('y', point[1] - height / 2);
-    rect.setAttribute('width', width);
-    rect.setAttribute('height', height);
-    rect.setAttribute('fill', '#7E22CE');
-    rect.setAttribute('stroke', '#0D9488');
-    rect.setAttribute('stroke-width', '2.5');
-    rect.style.pointerEvents = 'auto';
-    rect.style.cursor = 'grab';
-    rect.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'baseline'));
-    svg.appendChild(rect);
-  });
+      baselinePoints.forEach((point, vIndex) => {
+        if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
+
+        const width = 18 * scale;
+        const height = 12 * scale;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', point[0] - width / 2);
+        rect.setAttribute('y', point[1] - height / 2);
+        rect.setAttribute('width', width);
+        rect.setAttribute('height', height);
+        rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
+        rect.setAttribute('stroke', '#7A1230');
+        rect.setAttribute('stroke-width', 2.5 * scale);
+        rect.style.pointerEvents = 'auto';
+        rect.style.cursor = 'grab';
+        rect.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'baseline'));
+        svg.appendChild(rect);
+      });
+    }
+  }
+
+  document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'flex' : 'none';
 }
 
-document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'flex' : 'none';
-
-}
 
 
 
@@ -578,6 +596,15 @@ if (savedLines && savedLines.length > 0) {
   drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
 }
 
+document.getElementById('show-polygons-checkbox').addEventListener('change', (e) => {
+  showPolygons = e.target.checked;
+  renderOverlay();
+});
+
+document.getElementById('show-baselines-checkbox').addEventListener('change', (e) => {
+  showBaselines = e.target.checked;
+  renderOverlay();
+});
 
 //
 function startVertexDrag(e, lineIndex, vertexIndex, type) {
