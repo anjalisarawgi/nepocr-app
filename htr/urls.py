@@ -16,7 +16,6 @@ urlpatterns =[
     path('advance-segmentation/<int:pk>/', views.advance_to_segmentation, name='advance_to_segmentation'),
     path('segment/<int:pk>/', views.run_segmentation, name='run_segmentation'),
     path('save-segmentation/<int:pk>/', views.save_segmentation, name='save_segmentation'),
-
-
+    
 ]   
 #

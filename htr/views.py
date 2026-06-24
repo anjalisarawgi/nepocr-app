@@ -228,7 +228,10 @@ def run_segmentation(request, pk):
 
         lines = []
         for line in result.lines:
-            lines.append({'polygon': line.boundary})
+            lines.append({
+                'polygon': line.boundary,
+                'baseline': line.baseline,
+            })
 
         
         image.line_coordinates = lines
@@ -256,3 +259,4 @@ def save_segmentation(request, pk):
         image.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+

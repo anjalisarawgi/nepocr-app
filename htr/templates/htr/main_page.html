@@ -78,12 +78,24 @@
         </div>
         <div class="preview-bar" id="preview-bar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
           <span id="preview-filename">{% if selected_doc %}{{ selected_doc.filename }}{% endif %}</span>
-
+        
+          <button id="delete-line-btn" class="btn-delete-line" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+            </svg>
+            Delete line
+          </button>
+          
+          
+        
           <div class="before-after-toggle" id="before-after-toggle" style="display: {% if selected_doc.processed %}flex{% else %}none{% endif %};">
             <button class="ba-btn active" id="before-btn" data-mode="before">Before</button>
             <button class="ba-btn" id="after-btn" data-mode="after">After</button>
           </div>
-
+        
           <button id="next-step-btn" class="btn-next-bar">
             Next:
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -254,12 +266,10 @@
             <div class="accordion-body">
               <div class="accordion-body-inner">
                 <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
+                
 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
-                <div class="segmentation-actions" id="segmentation-actions" style="display:none;">
-                  <button class="btn-secondary" type="button" id="delete-line-btn" style="display:none;">Delete selected line</button>
-                  <button class="btn-primary" type="button" id="save-segmentation-btn">Save changes</button>
-                </div>
+
               </div>
             </div>
           </div>
@@ -302,9 +312,12 @@
   </div>
 
   <script>
-      let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
-      let lockedImageUrl = {% if selected_doc.locked_image %}"{{ selected_doc.locked_image.url }}"{% else %}null{% endif %};
-      let processedImageUrl = {% if selected_doc.processed %}"{{ selected_doc.processed.url }}"{% else %}null{% endif %};
+    let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
+    let lockedImageUrl = {% if selected_doc.locked_image %}"{{ selected_doc.locked_image.url }}"{% else %}null{% endif %};
+    let processedImageUrl = {% if selected_doc.processed %}"{{ selected_doc.processed.url }}"{% else %}null{% endif %};
+    let savedLines = {% if selected_doc.line_coordinates %}{{ selected_doc.line_coordinates|safe }}{% else %}null{% endif %};
+    let savedPageWidth = {% if selected_doc.processed %}{{ selected_doc.processed.width|default:0 }}{% elif selected_doc.locked_image %}{{ selected_doc.locked_image.width|default:0 }}{% else %}0{% endif %};
+    let savedPageHeight = {% if selected_doc.processed %}{{ selected_doc.processed.height|default:0 }}{% elif selected_doc.locked_image %}{{ selected_doc.locked_image.height|default:0 }}{% else %}0{% endif %};
   </script>
   <script src="{% static 'htr/js/workspace.js' %}"></script>
   <script>

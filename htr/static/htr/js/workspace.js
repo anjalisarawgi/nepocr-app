@@ -204,9 +204,7 @@ let panY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 
-function applyZoom() {
-  previewImage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-}
+
 
 previewImage.addEventListener('mousedown', (e) => {
   if (zoomLevel <= 1) return;
@@ -464,7 +462,10 @@ let selectedLineIndex = null;
 let overlayPageWidth, overlayPageHeight;
 
 function drawLineOverlay(lines, pageWidth, pageHeight) {
-  segmentationLines = lines.map(l => ({ polygon: l.polygon.map(p => [p[0], p[1]]) }));
+  segmentationLines = lines.map(l => ({
+    polygon: l.polygon.map(p => [p[0], p[1]]),
+    baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [],
+  }));
   selectedLineIndex = null;
   overlayPageWidth = pageWidth;
   overlayPageHeight = pageHeight;
@@ -479,11 +480,22 @@ function renderOverlay() {
 
   segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
+  
+    const polygonHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygonHalo.setAttribute('points', points);
+    polygonHalo.setAttribute('fill', 'none');
+    polygonHalo.setAttribute('stroke', '#ffffff');
+    polygonHalo.setAttribute('stroke-width', index === selectedLineIndex ? '8' : '7');
+    polygonHalo.setAttribute('stroke-opacity', '0.6');
+    polygonHalo.style.pointerEvents = 'none';
+    svg.appendChild(polygonHalo);
+    
     const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     polygon.setAttribute('points', points);
-    polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(168,81,46,0.4)' : 'rgba(168,81,46,0.25)');
-    polygon.setAttribute('stroke', '#A8512E');
-    polygon.setAttribute('stroke-width', index === selectedLineIndex ? '3' : '2');
+    polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
+    polygon.setAttribute('stroke', '#191919');
+    polygon.setAttribute('stroke-width', index === selectedLineIndex ? '4' : '0');
+
     polygon.style.pointerEvents = 'auto';
     polygon.style.cursor = 'pointer';
     polygon.addEventListener('click', (e) => {
@@ -492,29 +504,83 @@ function renderOverlay() {
       renderOverlay();
     });
     svg.appendChild(polygon);
+  
+    if (line.baseline && line.baseline.length > 0) {
+      const baselinePoints = line.baseline.map(p => p.join(',')).join(' ');
+  
+      const baselineHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      baselineHalo.setAttribute('points', baselinePoints);
+      baselineHalo.setAttribute('fill', 'none');
+      baselineHalo.setAttribute('stroke', '#ffffff');
+      baselineHalo.setAttribute('stroke-width', '6');
+      baselineHalo.setAttribute('stroke-opacity', '0.55');
+      baselineHalo.style.pointerEvents = 'none';
+      svg.appendChild(baselineHalo);
+      
+      const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      baseline.setAttribute('points', baselinePoints);
+      baseline.setAttribute('fill', 'none');
+      baseline.setAttribute('stroke', '#7E22CE');
+      baseline.setAttribute('stroke-width', '6');
+      // baseline.setAttribute('stroke-dasharray', '8 5');
+      baseline.style.pointerEvents = 'none';
+      svg.appendChild(baseline);
+    }
   });
 
-  if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
-    segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', point[0]);
-      circle.setAttribute('cy', point[1]);
-      circle.setAttribute('r', 6);
-      circle.setAttribute('fill', '#fff');
-      circle.setAttribute('stroke', '#A8512E');
-      circle.setAttribute('stroke-width', '2');
-      circle.style.pointerEvents = 'auto';
-      circle.style.cursor = 'grab';
-      circle.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex));
-      svg.appendChild(circle);
-    });
-  }
+if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
+  segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
+    const size = 25;
+    const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    square.setAttribute('x', point[0] - size / 2);
+    square.setAttribute('y', point[1] - size / 2);
+    square.setAttribute('width', size);
+    square.setAttribute('height', size);
+    square.setAttribute('fill', 'rgba(255,255,255,0.85)');
+    square.setAttribute('stroke', '#191919');
+    square.setAttribute('stroke-width', '4');
+    square.style.pointerEvents = 'auto';
+    square.style.cursor = 'grab';
+    square.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'polygon'));
+    svg.appendChild(square);
+  });
 
-  document.getElementById('segmentation-actions').style.display = segmentationLines.length ? 'flex' : 'none';
-  document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'inline-block' : 'none';
+  const baselinePoints = segmentationLines[selectedLineIndex].baseline;
+  const showEvery = baselinePoints.length > 15 ? 2 : 1;
+
+  baselinePoints.forEach((point, vIndex) => {
+    if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
+  
+    const width = 30;
+    const height = 30;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', point[0] - width / 2);
+    rect.setAttribute('y', point[1] - height / 2);
+    rect.setAttribute('width', width);
+    rect.setAttribute('height', height);
+    rect.setAttribute('fill', '#7E22CE');
+    rect.setAttribute('stroke', '#0D9488');
+    rect.setAttribute('stroke-width', '2.5');
+    rect.style.pointerEvents = 'auto';
+    rect.style.cursor = 'grab';
+    rect.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'baseline'));
+    svg.appendChild(rect);
+  });
 }
 
-function startVertexDrag(e, lineIndex, vertexIndex) {
+document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'flex' : 'none';
+
+}
+
+
+
+if (savedLines && savedLines.length > 0) {
+  drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
+}
+
+
+//
+function startVertexDrag(e, lineIndex, vertexIndex, type) {
   e.stopPropagation();
   e.preventDefault();
   const svg = document.getElementById('line-overlay');
@@ -527,7 +593,7 @@ function startVertexDrag(e, lineIndex, vertexIndex) {
 
   function onMouseMove(moveEvent) {
     const svgPoint = screenToSvgPoint(moveEvent.clientX, moveEvent.clientY);
-    segmentationLines[lineIndex].polygon[vertexIndex] = [svgPoint.x, svgPoint.y];
+    segmentationLines[lineIndex][type][vertexIndex] = [svgPoint.x, svgPoint.y];
     renderOverlay();
   }
 
@@ -539,6 +605,7 @@ function startVertexDrag(e, lineIndex, vertexIndex) {
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
 }
+
 
 document.getElementById('delete-line-btn').addEventListener('click', () => {
   if (selectedLineIndex !== null) {
@@ -565,14 +632,7 @@ document.getElementById('save-segmentation-btn').addEventListener('click', () =>
     });
 });
 
-const runModelRadio = document.getElementById('run-model-radio');
 
-runModelRadio.addEventListener('change', () => {
-  document.querySelectorAll('#run-model-card, #upload-xml-card').forEach((card) => {
-    card.classList.remove('checked');
-  });
-  runModelRadio.closest('.option-card').classList.add('checked');
-});
 
 function applyZoom() {
   const transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
@@ -584,5 +644,4 @@ function applyZoom() {
     lineOverlay.style.transformOrigin = previewImage.style.transformOrigin || 'center center';
   }
 }
-
 

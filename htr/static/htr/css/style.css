@@ -645,3 +645,23 @@ nav {
   cursor: pointer;
 }
 .btn-secondary:hover { background: var(--accent-soft); }
+
+
+.btn-delete-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  margin-right: 10px;
+}
+.btn-delete-line:hover { background: var(--accent-soft); }
+.btn-delete-line svg { width: 13px; height: 13px; }
+
