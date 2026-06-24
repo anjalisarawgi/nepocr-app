@@ -260,3 +260,26 @@ def save_segmentation(request, pk):
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
 
+
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+
+@login_required
+def export_alto_xml(request, pk):
+    image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
+    source = image.processed if image.processed else image.locked_image
+    width = source.width if source else 0
+    height = source.height if source else 0
+
+    xml_content = render_to_string('htr/alto_template.xml', {
+        'filename': image.filename,
+        'width': width,
+        'height': height,
+        'lines': image.line_coordinates,
+    })
+
+    response = HttpResponse(xml_content, content_type='application/xml')
+    response['Content-Disposition'] = f'attachment; filename="{image.filename}_lines.xml"'
+    return response

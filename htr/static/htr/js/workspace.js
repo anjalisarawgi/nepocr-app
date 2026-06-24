@@ -42,19 +42,39 @@ handle.addEventListener('mousedown', () => {
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (!isDragging) return;
-  const newWidth = Math.min(Math.max(e.clientX, 160), 480); // clamp between 160px and 480px
-  // workspace.style.gridTemplateColumns = `${newWidth}px 6px 50fr 40fr`;
-  workspace.style.gridTemplateColumns = `${newWidth}px 6px 1fr 500px`;
-
-
+  if (mouseDownPos) {
+    const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+    if (dist > 4) didDrag = true;
+  }
+  if (!isPanning) return;
+  panX = e.clientX - panStart.x;
+  panY = e.clientY - panStart.y;
+  applyZoom();
 });
 
 document.addEventListener('mouseup', () => {
-  isDragging = false;
-  handle.classList.remove('dragging');
+  isPanning = false;
+  mouseDownPos = null;
+  previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
 });
 
+document.addEventListener('keydown', (e) => {
+  const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+  if (isTyping) return;
+
+  if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+    if (segmentationLines.length > 0) {
+      e.preventDefault();
+      selectedIndices = new Set(segmentationLines.map((_, i) => i));
+      renderOverlay();
+    }
+  }
+
+  if (e.key === 'Escape') {
+    selectedIndices = new Set();
+    renderOverlay();
+  }
+});
 
 ////// crop //
 
@@ -206,12 +226,21 @@ let panStart = { x: 0, y: 0 };
 
 
 
-previewImage.addEventListener('mousedown', (e) => {
+let mouseDownPos = null;
+let didDrag = false;
+
+function startPan(e) {
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+  didDrag = false;
   if (zoomLevel <= 1) return;
   isPanning = true;
   panStart = { x: e.clientX - panX, y: e.clientY - panY };
   previewImage.style.cursor = 'grabbing';
-});
+}
+
+previewImage.addEventListener('mousedown', startPan);
+document.getElementById('line-overlay').addEventListener('mousedown', startPan);
+
 
 document.addEventListener('mousemove', (e) => {
   if (!isPanning) return;
@@ -458,7 +487,7 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
 });
 
 let segmentationLines = [];
-let selectedLineIndex = null;
+let selectedIndices = new Set();
 let overlayPageWidth, overlayPageHeight;
 let showPolygons = true;
 let showBaselines = true;
@@ -474,13 +503,12 @@ function drawLineOverlay(lines, pageWidth, pageHeight) {
     polygon: l.polygon.map(p => [p[0], p[1]]),
     baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [],
   }));
-  selectedLineIndex = null;
+  selectedIndices = new Set();
   overlayPageWidth = pageWidth;
   overlayPageHeight = pageHeight;
   document.getElementById('overlay-toggle-group').style.display = 'flex';
   renderOverlay();
 }
-
 
 function renderOverlay() {
   const svg = document.getElementById('line-overlay');
@@ -498,22 +526,31 @@ function renderOverlay() {
       const polygonHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygonHalo.setAttribute('points', points);
       polygonHalo.setAttribute('fill', 'none');
-      polygonHalo.setAttribute('stroke', '#ffffff');
-      polygonHalo.setAttribute('stroke-width', (index === selectedLineIndex ? 8 : 7) * scale);
-      polygonHalo.setAttribute('stroke-opacity', '0.6');
+      // polygonHalo.setAttribute('stroke', '#ffffff');
+      // polygonHalo.setAttribute('stroke-width', (selectedIndices.has(index) ? 0 : 7) * scale);
+      // polygonHalo.setAttribute('stroke-opacity', '0.6');
       polygonHalo.style.pointerEvents = 'none';
       svg.appendChild(polygonHalo);
 
       const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygon.setAttribute('points', points);
-      polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
-      polygon.setAttribute('stroke', '#1E5AC8');
-      polygon.setAttribute('stroke-width', (index === selectedLineIndex ? 4 : 0) * scale);
+      polygon.setAttribute('fill', selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
+      polygon.setAttribute('stroke', '#191919');
+      polygon.setAttribute('stroke-width', (selectedIndices.has(index) ? 2.5 : 0) * scale);
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = 'pointer';
       polygon.addEventListener('click', (e) => {
         e.stopPropagation();
-        selectedLineIndex = index;
+        if (didDrag) return;
+        if (e.metaKey || e.ctrlKey) {
+          if (selectedIndices.has(index)) {
+            selectedIndices.delete(index);
+          } else {
+            selectedIndices.add(index);
+          }
+        } else {
+          selectedIndices = new Set([index]);
+        }
         renderOverlay();
       });
       svg.appendChild(polygon);
@@ -534,59 +571,61 @@ function renderOverlay() {
       const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       baseline.setAttribute('points', baselinePoints);
       baseline.setAttribute('fill', 'none');
-      baseline.setAttribute('stroke', '#7A1230');
-      baseline.setAttribute('stroke-width', 5 * scale);
-      baseline.setAttribute('stroke-dasharray', `${8 * scale} ${5 * scale}`);
+      baseline.setAttribute('stroke', '#7E22CE');
+      baseline.setAttribute('stroke-width', 4 * scale);
+      baseline.setAttribute('stroke-solid', `${8 * scale} ${3 * scale}`);
       baseline.style.pointerEvents = 'none';
       svg.appendChild(baseline);
     }
   });
 
-  if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
+  selectedIndices.forEach((selIndex) => {
+    if (!segmentationLines[selIndex]) return;
+  
     if (showPolygons) {
-      segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
-        const size = 16 * scale;
+      segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
+        const size = 12 * scale;
         const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         square.setAttribute('x', point[0] - size / 2);
         square.setAttribute('y', point[1] - size / 2);
         square.setAttribute('width', size);
         square.setAttribute('height', size);
         square.setAttribute('fill', 'rgba(255,255,255,0.85)');
-        square.setAttribute('stroke', '#1E5AC8');
-        square.setAttribute('stroke-width', 2.5 * scale);
+        square.setAttribute('stroke', '#191919');
+        square.setAttribute('stroke-width', 2 * scale);
         square.style.pointerEvents = 'auto';
         square.style.cursor = 'grab';
-        square.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'polygon'));
+        square.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'polygon'));
         svg.appendChild(square);
       });
     }
-
+  
     if (showBaselines) {
-      const baselinePoints = segmentationLines[selectedLineIndex].baseline;
+      const baselinePoints = segmentationLines[selIndex].baseline;
       const showEvery = baselinePoints.length > 15 ? 2 : 1;
-
+  
       baselinePoints.forEach((point, vIndex) => {
         if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
-
-        const width = 18 * scale;
-        const height = 12 * scale;
+  
+        const width = 14 * scale;
+        const height = 14 * scale;
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', point[0] - width / 2);
         rect.setAttribute('y', point[1] - height / 2);
         rect.setAttribute('width', width);
         rect.setAttribute('height', height);
         rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
-        rect.setAttribute('stroke', '#7A1230');
+        rect.setAttribute('stroke', '#7E22CE');
         rect.setAttribute('stroke-width', 2.5 * scale);
         rect.style.pointerEvents = 'auto';
         rect.style.cursor = 'grab';
-        rect.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex, 'baseline'));
+        rect.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'baseline'));
         svg.appendChild(rect);
       });
     }
-  }
-
-  document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'flex' : 'none';
+  });
+  
+  document.getElementById('delete-line-btn').style.display = selectedIndices.size > 0 ? 'flex' : 'none';
 }
 
 
@@ -635,11 +674,9 @@ function startVertexDrag(e, lineIndex, vertexIndex, type) {
 
 
 document.getElementById('delete-line-btn').addEventListener('click', () => {
-  if (selectedLineIndex !== null) {
-    segmentationLines.splice(selectedLineIndex, 1);
-    selectedLineIndex = null;
-    renderOverlay();
-  }
+  segmentationLines = segmentationLines.filter((_, i) => !selectedIndices.has(i));
+  selectedIndices = new Set();
+  renderOverlay();
 });
 
 document.getElementById('save-segmentation-btn').addEventListener('click', () => {
@@ -672,3 +709,11 @@ function applyZoom() {
   }
 }
 
+document.getElementById('download-image-btn').addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.href = previewImage.src;
+  link.download = currentDocId ? `document-${currentDocId}.jpg` : 'image.jpg';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+});
