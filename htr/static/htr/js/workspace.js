@@ -459,22 +459,111 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
     });
 });
 
-function drawLineOverlay(lines, pageWidth, pageHeight) {
-  const svg = document.getElementById('line-overlay');
-  svg.setAttribute('viewBox', `0 0 ${pageWidth} ${pageHeight}`);
-  svg.innerHTML = '';
-  svg.style.display = 'block';
+let segmentationLines = [];
+let selectedLineIndex = null;
+let overlayPageWidth, overlayPageHeight;
 
-  lines.forEach((line) => {
+function drawLineOverlay(lines, pageWidth, pageHeight) {
+  segmentationLines = lines.map(l => ({ polygon: l.polygon.map(p => [p[0], p[1]]) }));
+  selectedLineIndex = null;
+  overlayPageWidth = pageWidth;
+  overlayPageHeight = pageHeight;
+  renderOverlay();
+}
+
+function renderOverlay() {
+  const svg = document.getElementById('line-overlay');
+  svg.setAttribute('viewBox', `0 0 ${overlayPageWidth} ${overlayPageHeight}`);
+  svg.innerHTML = '';
+  svg.style.display = segmentationLines.length ? 'block' : 'none';
+
+  segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
     const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     polygon.setAttribute('points', points);
-    polygon.setAttribute('fill', 'rgba(168,81,46,0.25)');
+    polygon.setAttribute('fill', index === selectedLineIndex ? 'rgba(168,81,46,0.4)' : 'rgba(168,81,46,0.25)');
     polygon.setAttribute('stroke', '#A8512E');
-    polygon.setAttribute('stroke-width', '2');
+    polygon.setAttribute('stroke-width', index === selectedLineIndex ? '3' : '2');
+    polygon.style.pointerEvents = 'auto';
+    polygon.style.cursor = 'pointer';
+    polygon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedLineIndex = index;
+      renderOverlay();
+    });
     svg.appendChild(polygon);
   });
+
+  if (selectedLineIndex !== null && segmentationLines[selectedLineIndex]) {
+    segmentationLines[selectedLineIndex].polygon.forEach((point, vIndex) => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', point[0]);
+      circle.setAttribute('cy', point[1]);
+      circle.setAttribute('r', 6);
+      circle.setAttribute('fill', '#fff');
+      circle.setAttribute('stroke', '#A8512E');
+      circle.setAttribute('stroke-width', '2');
+      circle.style.pointerEvents = 'auto';
+      circle.style.cursor = 'grab';
+      circle.addEventListener('mousedown', (e) => startVertexDrag(e, selectedLineIndex, vIndex));
+      svg.appendChild(circle);
+    });
+  }
+
+  document.getElementById('segmentation-actions').style.display = segmentationLines.length ? 'flex' : 'none';
+  document.getElementById('delete-line-btn').style.display = selectedLineIndex !== null ? 'inline-block' : 'none';
 }
+
+function startVertexDrag(e, lineIndex, vertexIndex) {
+  e.stopPropagation();
+  e.preventDefault();
+  const svg = document.getElementById('line-overlay');
+
+  function screenToSvgPoint(clientX, clientY) {
+    const pt = new DOMPoint(clientX, clientY);
+    const ctm = svg.getScreenCTM().inverse();
+    return pt.matrixTransform(ctm);
+  }
+
+  function onMouseMove(moveEvent) {
+    const svgPoint = screenToSvgPoint(moveEvent.clientX, moveEvent.clientY);
+    segmentationLines[lineIndex].polygon[vertexIndex] = [svgPoint.x, svgPoint.y];
+    renderOverlay();
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
+document.getElementById('delete-line-btn').addEventListener('click', () => {
+  if (selectedLineIndex !== null) {
+    segmentationLines.splice(selectedLineIndex, 1);
+    selectedLineIndex = null;
+    renderOverlay();
+  }
+});
+
+document.getElementById('save-segmentation-btn').addEventListener('click', () => {
+  fetch(`/save-segmentation/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lines: segmentationLines }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        const btn = document.getElementById('save-segmentation-btn');
+        const original = btn.textContent;
+        btn.textContent = 'Saved ✓';
+        setTimeout(() => { btn.textContent = original; }, 1500);
+      }
+    });
+});
 
 const runModelRadio = document.getElementById('run-model-radio');
 

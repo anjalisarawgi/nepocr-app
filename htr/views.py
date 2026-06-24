@@ -245,3 +245,14 @@ def run_segmentation(request, pk):
 
 
 
+import json
+
+@login_required
+def save_segmentation(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        data = json.loads(request.body)
+        image.line_coordinates = data.get('lines', [])
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
