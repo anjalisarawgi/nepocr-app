@@ -425,3 +425,75 @@ function setMode(mode) {
 
 beforeBtn.addEventListener('click', () => setMode('before'));
 afterBtn.addEventListener('click', () => setMode('after'));
+
+// segmentation
+document.getElementById('run-segmentation-btn').addEventListener('click', () => {
+  fetch(`/advance-segmentation/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
+
+// kraken
+document.getElementById('run-segmentation-model-btn').addEventListener('click', () => {
+  document.getElementById('processing-overlay').style.display = 'flex';
+
+  fetch(`/segment/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        drawLineOverlay(data.lines, data.page_width, data.page_height);
+      }
+    })
+    .finally(() => {
+      document.getElementById('processing-overlay').style.display = 'none';
+    });
+});
+
+function drawLineOverlay(lines, pageWidth, pageHeight) {
+  const svg = document.getElementById('line-overlay');
+  svg.setAttribute('viewBox', `0 0 ${pageWidth} ${pageHeight}`);
+  svg.innerHTML = '';
+  svg.style.display = 'block';
+
+  lines.forEach((line) => {
+    const points = line.polygon.map(p => p.join(',')).join(' ');
+    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', points);
+    polygon.setAttribute('fill', 'rgba(168,81,46,0.25)');
+    polygon.setAttribute('stroke', '#A8512E');
+    polygon.setAttribute('stroke-width', '2');
+    svg.appendChild(polygon);
+  });
+}
+
+const runModelRadio = document.getElementById('run-model-radio');
+
+runModelRadio.addEventListener('change', () => {
+  document.querySelectorAll('#run-model-card, #upload-xml-card').forEach((card) => {
+    card.classList.remove('checked');
+  });
+  runModelRadio.closest('.option-card').classList.add('checked');
+});
+
+function applyZoom() {
+  const transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
+  previewImage.style.transform = transform;
+
+  const lineOverlay = document.getElementById('line-overlay');
+  if (lineOverlay) {
+    lineOverlay.style.transform = transform;
+    lineOverlay.style.transformOrigin = previewImage.style.transformOrigin || 'center center';
+  }
+}
+
+

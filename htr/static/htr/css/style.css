@@ -406,7 +406,13 @@ nav {
 .option-card.checked .checkbox-box { background: var(--accent); border-color: var(--accent); }
 .checkbox-box svg { width: 11px; height: 11px; color: var(--bg); opacity: 0; }
 .option-card.checked .checkbox-box svg { opacity: 1; }
-.option-card input[type="checkbox"] { position: absolute; opacity: 0; pointer-events: none; }
+
+.option-card input[type="checkbox"],
+.option-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
 
 .option-text {
   display: flex;
@@ -614,4 +620,9 @@ nav {
   width: 32px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+#preview-image,
+#line-overlay {
+  transform-origin: center center;
 }

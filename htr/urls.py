@@ -13,8 +13,9 @@ urlpatterns =[
     path('advance/<int:pk>/', views.advance_to_preprocessing, name='advance_to_preprocessing'),
     # path('gaussian/<int:pk>/', views.apply_gaussian, name='apply_gaussian'),
     path('preprocess/<int:pk>/', views.apply_preprocessing, name='apply_preprocessing'),
-
-
+    path('advance-segmentation/<int:pk>/', views.advance_to_segmentation, name='advance_to_segmentation'),
+    path('segment/<int:pk>/', views.run_segmentation, name='run_segmentation'),
+    
 
 ]   
 #

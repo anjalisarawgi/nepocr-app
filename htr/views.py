@@ -192,3 +192,56 @@ def apply_preprocessing(request, pk):
         return JsonResponse({'success': True, 'new_url': image.processed.url})
 
     return JsonResponse({'success': False})
+
+
+
+
+@login_required
+def advance_to_segmentation(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        image.status = 'segmented'
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
+
+
+from kraken import blla
+from kraken.lib import vgsl
+from PIL import Image
+import io
+
+KRAKEN_MODEL_PATH =  '/Users/anjalisarawgi/anaconda3/envs/gnn_hre/lib/python3.8/site-packages/kraken/blla.mlmodel'
+
+@login_required
+def run_segmentation(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
+        source_field = image.processed if image.processed else image.locked_image
+        source_field.open()
+        pil_image = Image.open(io.BytesIO(source_field.read())).convert('RGB')
+
+        model = vgsl.TorchVGSLModel.load_model(KRAKEN_MODEL_PATH)
+        result = blla.segment(pil_image, model=model)
+
+        lines = []
+        for line in result.lines:
+            lines.append({'polygon': line.boundary})
+
+        
+        image.line_coordinates = lines
+        image.save()
+
+        return JsonResponse({
+            'success': True,
+            'lines': lines,
+            'page_width': pil_image.width,
+            'page_height': pil_image.height,
+        })
+
+    return JsonResponse({'success': False})
+
+
+

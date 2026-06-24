@@ -97,6 +97,8 @@
         <div id="crop-overlay" class="crop-overlay" style="display:none;">
           <div id="crop-box" class="crop-box"></div>
         </div>
+        <svg id="line-overlay" style="position:absolute; top:38px; left:0; width:100%; height:calc(100% - 38px); display:none; pointer-events:none;"></svg>
+
       
         <div class="zoom-toolbar" id="zoom-toolbar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
 
@@ -139,7 +141,7 @@
 
       <div class="accordion" id="accordion">
 
-        <div class="accordion-section {% if selected_doc.status == 'uploaded' %}locked{% else %}active-step open{% endif %}" data-section="preprocessing">
+        <div class="accordion-section {% if selected_doc.status == 'uploaded' %}locked{% elif selected_doc.status == 'preprocessed' %}active-step open{% else %}locked done{% endif %}" data-section="preprocessing">
 
 
           <div class="accordion-header">
@@ -243,10 +245,19 @@
           </div>
         </div>
       
-        <div class="accordion-section locked" data-section="Segmentation">
+        <div class="accordion-section {% if selected_doc.status == 'segmented' or selected_doc.status == 'ocr_done' %}active-step open{% else %}locked{% endif %}" data-section="Segmentation">
           <div class="accordion-header">
             <span class="accordion-title">Step 2: Line Segmentation</span>
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="accordion-body-wrap">
+            <div class="accordion-body">
+              <div class="accordion-body-inner">
+                <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
+
+                <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+              </div>
+            </div>
           </div>
         </div>
       
