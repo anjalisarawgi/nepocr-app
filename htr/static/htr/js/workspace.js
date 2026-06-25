@@ -367,14 +367,45 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 
 } // closes "if (cropBtn)"
 
+// let zoomLevel = 1;
+// let panX = 0;
+// let panY = 0;
+// let isPanning = false;
+// let panStart = { x: 0, y: 0 };
+// let mouseDownPos = null;
+// let didDrag = false;
+
+// function startPan(e) {
+//   mouseDownPos = { x: e.clientX, y: e.clientY };
+//   didDrag = false;
+//   if (zoomLevel <= 1) return;
+//   isPanning = true;
+//   panStart = { x: e.clientX - panX, y: e.clientY - panY };
+//   previewImage.style.cursor = 'grabbing';
+// }
+
+// previewImage.addEventListener('mousedown', startPan);
+// document.getElementById('line-overlay').addEventListener('mousedown', startPan);
+
+
+// document.addEventListener('mousemove', (e) => {
+//   if (!isPanning) return;
+//   panX = e.clientX - panStart.x;
+//   panY = e.clientY - panStart.y;
+//   applyZoom();
+// });
+
+// document.addEventListener('mouseup', () => {
+//   isPanning = false;
+//   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+// });
+
+
 let zoomLevel = 1;
 let panX = 0;
 let panY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
-
-
-
 let mouseDownPos = null;
 let didDrag = false;
 
@@ -387,11 +418,13 @@ function startPan(e) {
   previewImage.style.cursor = 'grabbing';
 }
 
-previewImage.addEventListener('mousedown', startPan);
-document.getElementById('line-overlay').addEventListener('mousedown', startPan);
-
+document.querySelector('.preview-card').addEventListener('mousedown', startPan);
 
 document.addEventListener('mousemove', (e) => {
+  if (mouseDownPos) {
+    const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+    if (dist > 4) didDrag = true;
+  }
   if (!isPanning) return;
   panX = e.clientX - panStart.x;
   panY = e.clientY - panStart.y;
@@ -400,18 +433,17 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mouseup', () => {
   isPanning = false;
+  mouseDownPos = null;
   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
 });
 
-
-
 document.getElementById('zoom-in-btn').addEventListener('click', () => {
-  zoomLevel = Math.min(zoomLevel + 0.25, 3);
+  zoomLevel = Math.min(zoomLevel + 0.25, 8);
   applyZoom();
 });
 
 document.getElementById('zoom-out-btn').addEventListener('click', () => {
-  zoomLevel = Math.max(zoomLevel - 0.25, 1);
+  zoomLevel = Math.max(zoomLevel - 0.25, 0.5);
   applyZoom();
 });
 
@@ -440,10 +472,19 @@ function getTouchDistance(touches) {
 
 
 previewImage.addEventListener('wheel', (e) => {
-  if (e.ctrlKey) {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.01;
-    zoomLevel = Math.min(Math.max(zoomLevel + delta, 1), 3);
+  e.preventDefault();
+
+  if (e.ctrlKey || e.metaKey) {
+    const delta = -e.deltaY * 0.015;
+    zoomLevel = Math.min(Math.max(zoomLevel + delta, 1), 8);
+    if (zoomLevel === 1) {
+      panX = 0;
+      panY = 0;
+    }
+    applyZoom();
+  } else if (zoomLevel > 1) {
+    panX -= e.deltaX;
+    panY -= e.deltaY;
     applyZoom();
   }
 }, { passive: false });
