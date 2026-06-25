@@ -17,6 +17,7 @@ urlpatterns =[
     path('segment/<int:pk>/', views.run_segmentation, name='run_segmentation'),
     path('save-segmentation/<int:pk>/', views.save_segmentation, name='save_segmentation'),
     path('add-baseline/<int:pk>/', views.add_baseline_polygon, name='add_baseline_polygon'),
-
+    path('back-to-preprocessing/<int:pk>/', views.back_to_preprocessing, name='back_to_preprocessing'),
+    path('advance-ocr/<int:pk>/', views.advance_to_ocr, name='advance_to_ocr'),
+    path('back-to-segmentation/<int:pk>/', views.back_to_segmentation, name='back_to_segmentation'),
 ]   
-#

@@ -637,10 +637,9 @@ function renderOverlay() {
 
 
 
-if (savedLines && savedLines.length > 0) {
+if (savedLines && savedLines.length > 0 && (docStatus === 'segmented' || docStatus === 'ocr_done')) {
   drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
 }
-
 document.getElementById('show-polygons-checkbox').addEventListener('change', (e) => {
   showPolygons = e.target.checked;
   renderOverlay();
@@ -884,4 +883,45 @@ document.getElementById('undo-segmentation-btn').addEventListener('click', () =>
   if (segmentationHistory.length === 0) {
     document.getElementById('undo-segmentation-btn').style.display = 'none';
   }
+});
+
+document.getElementById('back-to-preprocessing-btn').addEventListener('click', () => {
+  fetch(`/back-to-preprocessing/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
+
+
+document.getElementById('advance-to-ocr-btn').addEventListener('click', () => {
+  fetch(`/advance-ocr/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
+
+
+document.getElementById('back-to-segmentation-btn').addEventListener('click', () => {
+  fetch(`/back-to-segmentation/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
 });

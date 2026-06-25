@@ -203,6 +203,12 @@
 
           <div class="accordion-header">
             <span class="accordion-title">Step 1: Image Cleaning</span>
+            {% if selected_doc.status != 'uploaded' %}
+              <span class="step-done-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Done
+              </span>
+            {% endif %}
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
           <div class="accordion-body-wrap">
@@ -297,25 +303,44 @@
                   </span>
                 </label>
 
-                <button class="btn-primary" type="button" id="run-segmentation-btn">Next: Line Segmentation</button>
+                <button class="btn-primary" type="button" id="run-segmentation-btn">Next Step: Line Segmentation</button>
                 
               </div>
             </div>
           </div>
         </div>
       
-        <div class="accordion-section {% if selected_doc.status == 'segmented' or selected_doc.status == 'ocr_done' %}active-step open{% else %}locked{% endif %}" data-section="Segmentation">
+        <div class="accordion-section {% if selected_doc.status == 'segmented' %}active-step open{% elif selected_doc.status == 'ocr_done' %}locked done{% else %}locked{% endif %}" data-section="Segmentation">
+
           <div class="accordion-header">
             <span class="accordion-title">Step 2: Line Segmentation</span>
+            {% if selected_doc.status == 'ocr_done' %}
+              <span class="step-done-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Done
+              </span>
+            {% endif %}
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
                 <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
-                <p class="credit-text">Model used: <a href="https://kraken.re/" target="_blank">Kraken</a>, with designing inspired from <a href="https://escriptorium.fr/" target="_blank">eScriptorium</a>.</p>
+                <p class="credit-text">Model used: Kraken (blla.model), with designing fully inspired from eScriptorium</a>.</p>
 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+
+                <div class="step-nav-row">
+                  <button class="btn-back-step" type="button" id="back-to-preprocessing-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    Back to Step 1
+                  </button>
+                  <button class="btn-primary" type="button" id="advance-to-ocr-btn">
+                    Next Step: Run OCR
+                  </button>
+                </div>
+                
+                <!-- <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button> -->
                                 
 <!-- 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
@@ -330,7 +355,8 @@
           </div>
         </div>
       
-        <div class="accordion-section locked" data-section="ocr">
+        <div class="accordion-section {% if selected_doc.status == 'ocr_done' %}active-step open{% else %}locked{% endif %}" data-section="ocr">
+
           <div class="accordion-header">
             <span class="accordion-title">Step 3: Run OCR</span>
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -338,13 +364,18 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <div class="subtabs">
-                  <div class="subtab active">OCR</div>
-                  <div class="subtab">Dictionary matching</div>
-                  <div class="subtab">Confidence intervals</div>
-                </div>
+                <!-- <div class="subtabs"> -->
+                  <!-- <div class="subtab active">OCR</div> -->
+                  <!-- <div class="subtab">Dictionary matching</div> -->
+                  <!-- <div class="subtab">Confidence intervals</div> -->
+                <!-- </div> -->
                 <p class="placeholder-text">Run the transcription model on the segmented lines, then review dictionary-matched suggestions and per-character confidence.</p>
                 <button class="btn-primary" type="button">Run OCR</button>
+              
+                <button class="btn-back-step" type="button" id="back-to-segmentation-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                  Back to Step 2
+                </button>
               </div>
             </div>
           </div>
@@ -373,6 +404,7 @@
     let savedLines = {% if selected_doc.line_coordinates %}{{ selected_doc.line_coordinates|safe }}{% else %}null{% endif %};
     let savedPageWidth = {% if selected_doc.processed %}{{ selected_doc.processed.width|default:0 }}{% elif selected_doc.locked_image %}{{ selected_doc.locked_image.width|default:0 }}{% else %}0{% endif %};
     let savedPageHeight = {% if selected_doc.processed %}{{ selected_doc.processed.height|default:0 }}{% elif selected_doc.locked_image %}{{ selected_doc.locked_image.height|default:0 }}{% else %}0{% endif %};
+    let docStatus = "{% if selected_doc %}{{ selected_doc.status }}{% endif %}";
   </script>
   <script src="{% static 'htr/js/workspace.js' %}"></script>
   <script>

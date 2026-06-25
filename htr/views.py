@@ -319,3 +319,36 @@ def add_baseline_polygon(request, pk):
         })
 
     return JsonResponse({'success': False})
+
+
+
+@login_required
+def back_to_preprocessing(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        image.status = 'preprocessed'
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
+
+
+@login_required
+def advance_to_ocr(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        image.status = 'ocr_done'
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
+
+@login_required
+def back_to_segmentation(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        image.status = 'segmented'
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
