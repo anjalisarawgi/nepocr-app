@@ -433,6 +433,15 @@ nav {
 }
 .btn-primary:hover { background: var(--accent); }
 
+.btn-primary:disabled {
+  background: var(--line-strong);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.btn-primary:disabled:hover {
+  background: var(--line-strong);
+}
+
 .export-panel {
   margin-top: auto;
   border-top: 1px solid var(--line);
@@ -769,10 +778,10 @@ nav {
 
 
 .credit-text {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--ink);
-  margin-top: -8px;
-  line-height: 1.4;
+  /* margin-top: -10px; */
+  line-height: 2;
 }
 
 .credit-text a {

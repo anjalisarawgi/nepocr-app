@@ -332,7 +332,7 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
+                <!-- <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p> -->
                 <p class="credit-text">Model used: Kraken (blla.model), with designing fully inspired from eScriptorium</a>.</p>
 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
@@ -342,7 +342,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                     Back to Step 1
                   </button>
-                  <button class="btn-primary" type="button" id="advance-to-ocr-btn">
+                  <button class="btn-primary" type="button" id="advance-to-ocr-btn" {% if not selected_doc.line_coordinates %}disabled{% endif %}>
                     Next Step: Run OCR
                   </button>
                 </div>

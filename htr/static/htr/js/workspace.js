@@ -629,6 +629,8 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
       if (data.success) {
         drawLineOverlay(data.lines, data.page_width, data.page_height);
         autoSaveSegmentation();
+        document.getElementById('advance-to-ocr-btn').disabled = false;
+
       }
     })
     .finally(() => {
@@ -830,6 +832,7 @@ document.getElementById('delete-line-btn').addEventListener('click', () => {
   selectedIndices = new Set();
   renderOverlay();
   autoSaveSegmentation();
+  document.getElementById('advance-to-ocr-btn').disabled = segmentationLines.length === 0;
 });
 
 let segmentationSaveDebounce;
