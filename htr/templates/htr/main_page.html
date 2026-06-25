@@ -40,19 +40,20 @@
            <span class="doc-name">{{ doc.filename }}</span>
            <span class="doc-updated">{{ doc.updated_at }}</span>
          </span>
+         <form method="post" action="{% url 'delete_image' doc.id %}" class="delete-form" onsubmit="return confirm('Delete this document?');">
+          {% csrf_token %}
+          <button type="submit" class="doc-delete-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+            </svg>
+          </button>
+        </form>
        </a>
-          <form method="post" action="{% url 'delete_image' doc.id %}" class="delete-form" onsubmit="return confirm('Delete this document?');">
-            {% csrf_token %}
-            <button type="submit" class="doc-delete-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6"/>
-                <path d="M14 11v6"/>
-                <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
-              </svg>
-            </button>
-          </form>
+
         </div>
         {% empty %}
         <p class="placeholder-text">No documents uploaded yet</p>
@@ -139,8 +140,8 @@
           </button>
           
           <div class="before-after-toggle" id="before-after-toggle" style="display: {% if selected_doc.processed %}flex{% else %}none{% endif %};">
-            <button class="ba-btn active" id="before-btn" data-mode="before">Before</button>
-            <button class="ba-btn" id="after-btn" data-mode="after">After</button>
+            <button class="ba-btn" id="before-btn" data-mode="before">Before</button>
+            <button class="ba-btn active" id="after-btn" data-mode="after">After</button>
           </div>
         
           <button id="next-step-btn" class="btn-next-bar" {% if selected_doc.status != 'uploaded' %}disabled{% endif %}>
@@ -310,7 +311,7 @@
                   </span>
                 </label>
 
-                <button class="btn-primary" type="button" id="run-segmentation-btn">Next Step: Line Segmentation</button>
+                <button class="btn-primary" type="button" id="run-segmentation-btn">Next Step →</button>
                 
               </div>
             </div>
@@ -333,17 +334,21 @@
             <div class="accordion-body">
               <div class="accordion-body-inner">
                 <!-- <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p> -->
-                <p class="credit-text">Model used: Kraken (blla.model), with designing fully inspired from eScriptorium</a>.</p>
+                <p class="credit-text">Model used: <strong>Kraken (blla.model)</strong>, with designing fully inspired from <strong>eScriptorium</strong></a>.</p>
 
-                <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+                <p class="placeholder-text">Click run segmentaiton to automatically detect lines. You may edit it as required.</p>
+
+
+                <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+
 
                 <div class="step-nav-row">
-                  <button class="btn-back-step" type="button" id="back-to-preprocessing-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                    Back to Step 1
+                  <button class="btn-primary" type="button" id="back-to-preprocessing-btn">
+                    <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> -->
+                    ← Previous Step
                   </button>
                   <button class="btn-primary" type="button" id="advance-to-ocr-btn" {% if not selected_doc.line_coordinates %}disabled{% endif %}>
-                    Next Step: Run OCR
+                    Next Step →
                   </button>
                 </div>
                 
@@ -376,8 +381,8 @@
                   <!-- <div class="subtab">Dictionary matching</div> -->
                   <!-- <div class="subtab">Confidence intervals</div> -->
                 <!-- </div> -->
-                <p class="placeholder-text">Run the transcription model on the segmented lines, then review dictionary-matched suggestions and per-character confidence.</p>
-                <button class="btn-primary" type="button" id="run-ocr-btn">Run OCR</button>
+                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegemented cannot be predicted. We also report the model confidence along with the ocr predictions. </p>
+                <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
                 
                 <div id="ocr-results" class="ocr-results">
                   {% if selected_doc.ocr_predictions %}
@@ -390,14 +395,24 @@
                   {% endif %}
                 </div>
                 
-                <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-secondary" id="download-ocr-btn" style="display: {% if selected_doc.ocr_predictions %}block{% else %}none{% endif %}; text-align:center; text-decoration:none;">
+                {% if selected_doc %}
+                <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-third" id="download-ocr-btn" style="display: {% if selected_doc.ocr_predictions %}block{% else %}none{% endif %}; text-align:center; text-decoration:none;">
                   Download as .txt
                 </a>
+                {% endif %}
               
-                <button class="btn-back-step" type="button" id="back-to-segmentation-btn">
+                <!-- <button class="btn-primary" type="button" id="back-to-segmentation-btn">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                  Back to Step 2
-                </button>
+                  ← Previous Step
+                </button> -->
+
+                <div class="step-nav-row">
+                  <button class="btn-primary" type="button" id="back-to-segmentation-btn">
+                    ← Previous Step
+                  </button>
+                </div>
+
+
               </div>
             </div>
           </div>

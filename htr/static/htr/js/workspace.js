@@ -386,6 +386,7 @@ function startPan(e) {
 
 previewImage.addEventListener('mousedown', startPan);
 document.getElementById('line-overlay').addEventListener('mousedown', startPan);
+document.getElementById('preview-card').addEventListener('mousedown', startPan);
 
 
 document.addEventListener('mousemove', (e) => {
@@ -728,7 +729,7 @@ function renderOverlay() {
       const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       baseline.setAttribute('points', baselinePoints);
       baseline.setAttribute('fill', 'none');
-      baseline.setAttribute('stroke', '#7E22CE');
+      baseline.setAttribute('stroke', '#E0117D');
       baseline.setAttribute('stroke-width', 4 * scale);
       baseline.setAttribute('stroke-solid', `${8 * scale} ${3 * scale}`);
       baseline.style.pointerEvents = 'none';
@@ -772,7 +773,7 @@ function renderOverlay() {
         rect.setAttribute('width', width);
         rect.setAttribute('height', height);
         rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
-        rect.setAttribute('stroke', '#7E22CE');
+        rect.setAttribute('stroke', '#E0117D');
         rect.setAttribute('stroke-width', 2.5 * scale);
         rect.style.pointerEvents = 'auto';
         rect.style.cursor = 'grab';

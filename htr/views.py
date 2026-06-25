@@ -464,6 +464,8 @@ def run_ocr(request, pk):
             dy = abs(y2 - y1)
             return dy > dx
 
+        Y_TOLERANCE = 25
+
         def line_sort_key(line):
             polygon = line.get('polygon', [])
             xs = [p[0] for p in polygon] if polygon else [0]
@@ -474,9 +476,11 @@ def run_ocr(request, pk):
             if is_vertical_line(line):
                 return (1, min_x, min_y)
             else:
-                return (0, min_y, min_x)
+                row_bucket = round(min_y / Y_TOLERANCE)
+                return (0, row_bucket, min_x)
 
         sorted_lines = sorted(lines, key=line_sort_key)
+
 
 
         predictions = []
@@ -622,7 +626,7 @@ def highlight_tokens_with_tooltips(line_text, df_tok):
             conf_cls = "conf-green"
 
         if cal is not None:
-            tooltip_lines.append(f"probability of correctness: {cal:.2f}")
+            tooltip_lines.append(f"Model probability: {cal:.2f}")
         for t, p in zip(alt_toks, alt_probs):
             try:
                 prob = float(p)

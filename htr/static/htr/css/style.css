@@ -31,7 +31,7 @@ nav {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: 44px;
+  height: 40px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -60,7 +60,7 @@ nav {
   display: grid;
   /* grid-template-columns:  220px 6px 50fr 35fr; */
   grid-template-columns: 280px 6px 1fr 550px;
-  height: calc(100vh - 46px);
+  height: calc(100vh - 40px);
 }
 
 .resize-handle {
@@ -431,7 +431,7 @@ nav {
   font-size: 13.5px; font-weight: 600;
   cursor: pointer;
 }
-.btn-primary:hover { background: var(--accent); }
+.btn-primary:hover { background: var(--canvas-bg); }
 
 .btn-primary:disabled {
   background: var(--line-strong);
@@ -652,8 +652,8 @@ nav {
 .btn-secondary {
   flex: 1;
   padding: 11px 0;
-  background: var(--bg);
-  color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
   border: 1px solid var(--accent);
   border-radius: 9px;
   font-family: var(--sans);
@@ -661,25 +661,43 @@ nav {
   font-weight: 600;
   cursor: pointer;
 }
-.btn-secondary:hover { background: var(--accent-soft); }
+.btn-secondary:hover { background: #914527 }
+
+.btn-third {
+  width: 140px;
+  padding: 8px 10px; /* 11px top/bottom, 12px left/right padding */
+  box-sizing: border-box; /* Ensures padding doesn't push the width past 120px */
+  text-align: center; /* Keeps the text beautifully centered */
+  background: var(--panel-bg);
+  color: var(--ink);
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 9px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-third:hover { 
+  background: var(--line); 
+}
 
 
 .btn-delete-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: none;
+  background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 7px;
   padding: 5px 10px;
   font-family: var(--sans);
   font-size: 12px;
   font-weight: 500;
-  color: var(--accent);
+  color: var(--bg);
   cursor: pointer;
   margin-right: 10px;
 }
-.btn-delete-line:hover { background: var(--accent-soft); }
+.btn-delete-line:hover { background: var(--accent); }
 .btn-delete-line svg { width: 13px; height: 13px; }
 
 .overlay-toggle-group {
@@ -779,7 +797,7 @@ nav {
 
 .credit-text {
   font-size: 13px;
-  color: var(--ink);
+  color: #1F51FF;
   /* margin-top: -10px; */
   line-height: 2;
 }
@@ -864,15 +882,15 @@ nav {
 .ocr-results {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 0.5px;
+  margin-top: 0px;
 }
 .ocr-line-result {
   display: flex;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 1px 10px;
   background: var(--panel-bg);
-  border-radius: 7px;
+  border-radius: 1px;
   font-size: 14px;
 }
 .ocr-line-number {
@@ -881,9 +899,9 @@ nav {
   flex: 0 0 auto;
   width: 20px;
 }
-.ocr-line-text {
+/* .ocr-line-text {
   font-family: var(--serif);
-}
+} */
 
 .ocr-token { cursor: help; position: relative; display: inline; text-decoration: underline; text-decoration-thickness: 2px; }
 .conf-red    { text-decoration-color: rgba(220,38,38,0.9); }
@@ -896,11 +914,11 @@ nav {
   position: absolute;
   left: 0;
   bottom: 120%;
-  background: #222;
-  color: #fff;
+  background: var(--canvas-bg);
+  color: var(--bg);
   padding: 8px 10px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 10.5px;
   line-height: 1.4;
   min-width: 180px;
   max-width: 320px;
@@ -909,5 +927,5 @@ nav {
   pointer-events: none;
   transition: opacity 0.15s ease-in-out;
 }
-.ocr-token:hover::after { opacity: 1; }
+.ocr-token:hover::after { opacity: 0.95; }
 
