@@ -20,4 +20,8 @@ urlpatterns =[
     path('back-to-preprocessing/<int:pk>/', views.back_to_preprocessing, name='back_to_preprocessing'),
     path('advance-ocr/<int:pk>/', views.advance_to_ocr, name='advance_to_ocr'),
     path('back-to-segmentation/<int:pk>/', views.back_to_segmentation, name='back_to_segmentation'),
+    path('run-ocr/<int:pk>/', views.run_ocr, name='run_ocr'),
+    path('download-ocr-text/<int:pk>/', views.download_ocr_text, name='download_ocr_text'),
+
+
 ]   

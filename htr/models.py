@@ -28,6 +28,7 @@ class UploadedImage(models.Model):
     locked_image = models.ImageField(upload_to="locked/", blank=True, null=True)
     preprocessing_settings = models.JSONField(default=dict, blank=True)
     line_coordinates = models.JSONField(default=list, blank=True)
+    ocr_predictions = models.JSONField(default=list, blank=True)
 
 
     @property

@@ -377,7 +377,22 @@
                   <!-- <div class="subtab">Confidence intervals</div> -->
                 <!-- </div> -->
                 <p class="placeholder-text">Run the transcription model on the segmented lines, then review dictionary-matched suggestions and per-character confidence.</p>
-                <button class="btn-primary" type="button">Run OCR</button>
+                <button class="btn-primary" type="button" id="run-ocr-btn">Run OCR</button>
+                
+                <div id="ocr-results" class="ocr-results">
+                  {% if selected_doc.ocr_predictions %}
+                    {% for pred in selected_doc.ocr_predictions %}
+                      <div class="ocr-line-result">
+                        <span class="ocr-line-number">{{ forloop.counter }}</span>
+                        <span class="ocr-line-text">{{ pred.html|safe }}</span>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+                
+                <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-secondary" id="download-ocr-btn" style="display: {% if selected_doc.ocr_predictions %}block{% else %}none{% endif %}; text-align:center; text-decoration:none;">
+                  Download as .txt
+                </a>
               
                 <button class="btn-back-step" type="button" id="back-to-segmentation-btn">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -390,7 +405,7 @@
       
       </div>
 
-      <div class="export-panel">
+      <!-- <div class="export-panel">
         <span class="export-heading">Export</span>
         <div class="export-options">
           <span class="export-chip checked">Image</span>
@@ -398,7 +413,7 @@
           <span class="export-chip">Predictions</span>
         </div>
         <button class="btn-export" type="button">Export selected</button>
-      </div>
+      </div> -->
 
     </section>
 

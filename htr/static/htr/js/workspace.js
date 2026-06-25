@@ -905,9 +905,19 @@ function screenToImagePoint(clientX, clientY) {
 
 lineOverlay.addEventListener('mousemove', (e) => {
   if (!isDrawingBaseline || drawnBaselinePoints.length === 0) return;
+  if (!isPointInsideImage(e.clientX, e.clientY)) return;
   const currentPoint = screenToImagePoint(e.clientX, e.clientY);
   renderDrawingPreview(currentPoint);
 });
+
+// document.addEventListener('keydown', (e) => {
+//   if (!isDrawingBaseline) return;
+//   if (e.key === 'Backspace' || e.key === 'Delete') {
+//     e.preventDefault();
+//     drawnBaselinePoints.pop();
+//     renderDrawingPreview();
+//   }
+// });
 
 document.addEventListener('keydown', (e) => {
   if (!isDrawingBaseline) return;
@@ -916,13 +926,17 @@ document.addEventListener('keydown', (e) => {
     drawnBaselinePoints.pop();
     renderDrawingPreview();
   }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    finishBaselineBtn.click();
+  }
 });
 
-lineOverlay.addEventListener('dblclick', (e) => {
-  if (!isDrawingBaseline) return;
-  e.preventDefault();
-  finishBaselineBtn.click();
-});
+// lineOverlay.addEventListener('dblclick', (e) => {
+//   if (!isDrawingBaseline) return;
+//   e.preventDefault();
+//   finishBaselineBtn.click();
+// });
 
 
 drawBaselineBtn.addEventListener('click', () => {
@@ -936,8 +950,39 @@ drawBaselineBtn.addEventListener('click', () => {
   renderOverlay();
 });
 
+function isPointInsideImage(clientX, clientY) {
+  const elementRect = previewImage.getBoundingClientRect();
+  const naturalAspect = previewImage.naturalWidth / previewImage.naturalHeight;
+  const elementAspect = elementRect.width / elementRect.height;
+
+  let renderedWidth, renderedHeight, offsetX, offsetY;
+
+  if (naturalAspect > elementAspect) {
+    renderedWidth = elementRect.width;
+    renderedHeight = elementRect.width / naturalAspect;
+    offsetX = 0;
+    offsetY = (elementRect.height - renderedHeight) / 2;
+  } else {
+    renderedHeight = elementRect.height;
+    renderedWidth = elementRect.height * naturalAspect;
+    offsetX = (elementRect.width - renderedWidth) / 2;
+    offsetY = 0;
+  }
+
+  const visibleLeft = elementRect.left + offsetX;
+  const visibleTop = elementRect.top + offsetY;
+
+  return (
+    clientX >= visibleLeft &&
+    clientX <= visibleLeft + renderedWidth &&
+    clientY >= visibleTop &&
+    clientY <= visibleTop + renderedHeight
+  );
+}
+
 lineOverlay.addEventListener('click', (e) => {
   if (!isDrawingBaseline || didDrag) return;
+  if (!isPointInsideImage(e.clientX, e.clientY)) return;
   const point = screenToImagePoint(e.clientX, e.clientY);
   drawnBaselinePoints.push(point);
   renderDrawingPreview();
@@ -1073,3 +1118,33 @@ document.getElementById('back-to-segmentation-btn').addEventListener('click', ()
       }
     });
 });
+
+
+// OCR 
+document.getElementById('run-ocr-btn').addEventListener('click', () => {
+  document.getElementById('processing-overlay').style.display = 'flex';
+
+  fetch(`/run-ocr/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        const resultsDiv = document.getElementById('ocr-results');
+        resultsDiv.innerHTML = '';
+        data.predictions.forEach((pred, i) => {
+          const row = document.createElement('div');
+          row.className = 'ocr-line-result';
+          row.innerHTML = `<span class="ocr-line-number">${i + 1}</span><span class="ocr-line-text">${pred.html}</span>`;
+          resultsDiv.appendChild(row);
+        });
+        document.getElementById('download-ocr-btn').style.display = 'block';
+      }
+    })
+    .finally(() => {
+      document.getElementById('processing-overlay').style.display = 'none';
+    });
+});
+
+
