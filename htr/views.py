@@ -283,3 +283,39 @@ def export_alto_xml(request, pk):
     response = HttpResponse(xml_content, content_type='application/xml')
     response['Content-Disposition'] = f'attachment; filename="{image.filename}_lines.xml"'
     return response
+
+
+
+from kraken.lib import segmentation as kraken_segmentation
+import json
+
+@login_required
+def add_baseline_polygon(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        data = json.loads(request.body)
+        baseline_points = data.get('baseline', [])
+
+        if len(baseline_points) < 2:
+            return JsonResponse({'success': False, 'error': 'Baseline needs at least 2 points.'})
+
+        source_field = image.processed if image.processed else image.locked_image
+        source_field.open()
+        pil_image = Image.open(io.BytesIO(source_field.read())).convert('RGB')
+
+        baseline_tuple = [tuple(p) for p in baseline_points]
+        polygons = kraken_segmentation.calculate_polygonal_environment(pil_image, [baseline_tuple])
+
+        polygon = polygons[0] if polygons and polygons[0] is not None else None
+        if polygon is None:
+            return JsonResponse({'success': False, 'error': 'Could not compute a polygon for this baseline. Try drawing it closer to the text line.'})
+
+        polygon_points = [[float(p[0]), float(p[1])] for p in polygon]
+
+        return JsonResponse({
+            'success': True,
+            'polygon': polygon_points,
+            'baseline': baseline_points,
+        })
+
+    return JsonResponse({'success': False})

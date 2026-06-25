@@ -269,6 +269,7 @@
                 </label>
 
                 <button class="btn-primary" type="button" id="run-segmentation-btn">Next: Line Segmentation</button>
+                
               </div>
             </div>
           </div>
@@ -283,9 +284,22 @@
             <div class="accordion-body">
               <div class="accordion-body-inner">
                 <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
-                
 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+                <button class="btn-secondary" type="button" id="draw-baseline-btn">Draw new baseline</button>
+                <div class="draw-baseline-actions" id="draw-baseline-actions" style="display:none;">
+                  <button class="btn-primary" type="button" id="finish-baseline-btn">Finish baseline</button>
+                  <button class="btn-secondary" type="button" id="cancel-baseline-btn">Cancel</button>
+                </div>
+                <button class="btn-primary" type="button" id="save-segmentation-btn">Save changes</button>
+                                
+<!-- 
+                <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+                <button class="btn-secondary" type="button" id="draw-baseline-btn">Draw new baseline</button>
+                <div class="draw-baseline-actions" id="draw-baseline-actions" style="display:none;">
+                  <button class="btn-primary" type="button" id="finish-baseline-btn">Finish baseline</button>
+                  <button class="btn-secondary" type="button" id="cancel-baseline-btn">Cancel</button>
+                </div> -->
 
               </div>
             </div>

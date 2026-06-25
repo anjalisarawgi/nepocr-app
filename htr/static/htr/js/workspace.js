@@ -52,6 +52,8 @@ document.addEventListener('mousemove', (e) => {
   applyZoom();
 });
 
+
+
 document.addEventListener('mouseup', () => {
   isPanning = false;
   mouseDownPos = null;
@@ -584,7 +586,7 @@ function renderOverlay() {
   
     if (showPolygons) {
       segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
-        const size = 12 * scale;
+        const size = 14 * scale;
         const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         square.setAttribute('x', point[0] - size / 2);
         square.setAttribute('y', point[1] - size / 2);
@@ -607,8 +609,8 @@ function renderOverlay() {
       baselinePoints.forEach((point, vIndex) => {
         if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
   
-        const width = 14 * scale;
-        const height = 14 * scale;
+        const width = 16 * scale;
+        const height = 16 * scale;
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', point[0] - width / 2);
         rect.setAttribute('y', point[1] - height / 2);
@@ -716,4 +718,132 @@ document.getElementById('download-image-btn').addEventListener('click', () => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+});
+
+
+//// draw baseline
+
+
+
+let isDrawingBaseline = false;
+let drawnBaselinePoints = [];
+
+const drawBaselineBtn = document.getElementById('draw-baseline-btn');
+const drawBaselineActions = document.getElementById('draw-baseline-actions');
+const finishBaselineBtn = document.getElementById('finish-baseline-btn');
+const cancelBaselineBtn = document.getElementById('cancel-baseline-btn');
+const lineOverlay = document.getElementById('line-overlay');
+
+function screenToImagePoint(clientX, clientY) {
+  const pt = new DOMPoint(clientX, clientY);
+  const ctm = lineOverlay.getScreenCTM().inverse();
+  const svgPoint = pt.matrixTransform(ctm);
+  return [svgPoint.x, svgPoint.y];
+}
+
+lineOverlay.addEventListener('mousemove', (e) => {
+  if (!isDrawingBaseline || drawnBaselinePoints.length === 0) return;
+  const currentPoint = screenToImagePoint(e.clientX, e.clientY);
+  renderDrawingPreview(currentPoint);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!isDrawingBaseline) return;
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    drawnBaselinePoints.pop();
+    renderDrawingPreview();
+  }
+});
+
+lineOverlay.addEventListener('dblclick', (e) => {
+  if (!isDrawingBaseline) return;
+  e.preventDefault();
+  finishBaselineBtn.click();
+});
+
+
+drawBaselineBtn.addEventListener('click', () => {
+  isDrawingBaseline = true;
+  drawnBaselinePoints = [];
+  drawBaselineActions.style.display = 'flex';
+  drawBaselineBtn.style.display = 'none';
+  lineOverlay.style.cursor = 'crosshair';
+  lineOverlay.style.display = 'block';
+  lineOverlay.style.pointerEvents = 'auto';
+  renderOverlay();
+});
+
+lineOverlay.addEventListener('click', (e) => {
+  if (!isDrawingBaseline || didDrag) return;
+  const point = screenToImagePoint(e.clientX, e.clientY);
+  drawnBaselinePoints.push(point);
+  renderDrawingPreview();
+});
+
+function renderDrawingPreview(livePoint) {
+  renderOverlay();
+  const scale = getOverlayScale();
+
+  if (drawnBaselinePoints.length > 0) {
+    const allPoints = livePoint ? [...drawnBaselinePoints, livePoint] : drawnBaselinePoints;
+    const pts = allPoints.map(p => p.join(',')).join(' ');
+
+    const preview = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    preview.setAttribute('points', pts);
+    preview.setAttribute('fill', 'none');
+    preview.setAttribute('stroke', '#0D9488');
+    preview.setAttribute('stroke-width', 4 * scale);
+    if (livePoint) preview.setAttribute('stroke-dasharray', `${10 * scale} ${6 * scale}`);
+    preview.style.pointerEvents = 'none';
+    lineOverlay.appendChild(preview);
+
+    drawnBaselinePoints.forEach((point) => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', point[0]);
+      circle.setAttribute('cy', point[1]);
+      circle.setAttribute('r', 5 * scale);
+      circle.setAttribute('fill', '#0D9488');
+      circle.style.pointerEvents = 'none';
+      lineOverlay.appendChild(circle);
+    });
+  }
+}
+function exitDrawMode() {
+  isDrawingBaseline = false;
+  drawnBaselinePoints = [];
+  drawBaselineActions.style.display = 'none';
+  drawBaselineBtn.style.display = 'inline-block';
+  lineOverlay.style.cursor = 'default';
+  lineOverlay.style.pointerEvents = 'none';
+  renderOverlay();
+}
+
+cancelBaselineBtn.addEventListener('click', exitDrawMode);
+
+finishBaselineBtn.addEventListener('click', () => {
+  if (drawnBaselinePoints.length < 2) {
+    alert('Click at least 2 points along the line before finishing.');
+    return;
+  }
+
+  document.getElementById('processing-overlay').style.display = 'flex';
+
+  fetch(`/add-baseline/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseline: drawnBaselinePoints }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        segmentationLines.push({ polygon: data.polygon, baseline: data.baseline });
+        exitDrawMode();
+      } else {
+        alert(data.error || 'Could not generate a polygon for this baseline.');
+      }
+    })
+    .finally(() => {
+      document.getElementById('processing-overlay').style.display = 'none';
+    });
 });
