@@ -72,12 +72,16 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+    e.preventDefault();
+    document.getElementById('undo-segmentation-btn').click();
+  }
+
   if (e.key === 'Escape') {
     selectedIndices = new Set();
     renderOverlay();
   }
 });
-
 ////// crop //
 
 let cropStart = null;
@@ -481,6 +485,7 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
     .then((data) => {
       if (data.success) {
         drawLineOverlay(data.lines, data.page_width, data.page_height);
+        autoSaveSegmentation();
       }
     })
     .finally(() => {
@@ -501,6 +506,7 @@ function getOverlayScale() {
 
 
 function drawLineOverlay(lines, pageWidth, pageHeight) {
+  if (segmentationLines.length > 0) pushHistory();
   segmentationLines = lines.map(l => ({
     polygon: l.polygon.map(p => [p[0], p[1]]),
     baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [],
@@ -516,10 +522,8 @@ function renderOverlay() {
   const svg = document.getElementById('line-overlay');
   svg.setAttribute('viewBox', `0 0 ${overlayPageWidth} ${overlayPageHeight}`);
   svg.innerHTML = '';
-  svg.style.display = segmentationLines.length ? 'block' : 'none';
+  svg.style.display = (segmentationLines.length || isDrawingBaseline) ? 'block' : 'none';
   const scale = getOverlayScale();
-
-
 
   segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
@@ -651,6 +655,8 @@ document.getElementById('show-baselines-checkbox').addEventListener('change', (e
 function startVertexDrag(e, lineIndex, vertexIndex, type) {
   e.stopPropagation();
   e.preventDefault();
+  pushHistory();
+
   const svg = document.getElementById('line-overlay');
 
   function screenToSvgPoint(clientX, clientY) {
@@ -664,11 +670,12 @@ function startVertexDrag(e, lineIndex, vertexIndex, type) {
     segmentationLines[lineIndex][type][vertexIndex] = [svgPoint.x, svgPoint.y];
     renderOverlay();
   }
-
   function onMouseUp() {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
+    debouncedSaveSegmentation();
   }
+
 
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
@@ -676,12 +683,16 @@ function startVertexDrag(e, lineIndex, vertexIndex, type) {
 
 
 document.getElementById('delete-line-btn').addEventListener('click', () => {
+  pushHistory();
   segmentationLines = segmentationLines.filter((_, i) => !selectedIndices.has(i));
   selectedIndices = new Set();
   renderOverlay();
+  autoSaveSegmentation();
 });
 
-document.getElementById('save-segmentation-btn').addEventListener('click', () => {
+let segmentationSaveDebounce;
+
+function autoSaveSegmentation() {
   fetch(`/save-segmentation/${currentDocId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
@@ -690,14 +701,18 @@ document.getElementById('save-segmentation-btn').addEventListener('click', () =>
     .then((res) => res.json())
     .then((data) => {
       if (data.success) {
-        const btn = document.getElementById('save-segmentation-btn');
-        const original = btn.textContent;
-        btn.textContent = 'Saved ✓';
-        setTimeout(() => { btn.textContent = original; }, 1500);
+        const status = document.getElementById('segmentation-save-status');
+        status.textContent = 'Saved';
+        status.classList.add('visible');
+        setTimeout(() => status.classList.remove('visible'), 1200);
       }
     });
-});
+}
 
+function debouncedSaveSegmentation() {
+  clearTimeout(segmentationSaveDebounce);
+  segmentationSaveDebounce = setTimeout(autoSaveSegmentation, 600);
+}
 
 
 function applyZoom() {
@@ -837,8 +852,10 @@ finishBaselineBtn.addEventListener('click', () => {
     .then((res) => res.json())
     .then((data) => {
       if (data.success) {
+        pushHistory();
         segmentationLines.push({ polygon: data.polygon, baseline: data.baseline });
         exitDrawMode();
+        autoSaveSegmentation();
       } else {
         alert(data.error || 'Could not generate a polygon for this baseline.');
       }
@@ -846,4 +863,25 @@ finishBaselineBtn.addEventListener('click', () => {
     .finally(() => {
       document.getElementById('processing-overlay').style.display = 'none';
     });
+});
+
+
+
+let segmentationHistory = [];
+
+function pushHistory() {
+  segmentationHistory.push(JSON.parse(JSON.stringify(segmentationLines)));
+  if (segmentationHistory.length > 30) segmentationHistory.shift();
+  document.getElementById('undo-segmentation-btn').style.display = 'flex';
+}
+
+document.getElementById('undo-segmentation-btn').addEventListener('click', () => {
+  if (segmentationHistory.length === 0) return;
+  segmentationLines = segmentationHistory.pop();
+  selectedIndices = new Set();
+  renderOverlay();
+  autoSaveSegmentation();
+  if (segmentationHistory.length === 0) {
+    document.getElementById('undo-segmentation-btn').style.display = 'none';
+  }
 });

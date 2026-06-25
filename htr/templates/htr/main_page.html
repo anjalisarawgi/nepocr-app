@@ -78,6 +78,8 @@
         </div>
         <div class="preview-bar" id="preview-bar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
           <span id="preview-filename">{% if selected_doc %}{{ selected_doc.filename }}{% endif %}</span>
+          <!-- <span id="segmentation-save-status" class="save-status"></span>  -->
+
           <button id="delete-line-btn" class="btn-delete-line" style="display:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
@@ -87,7 +89,7 @@
             </svg>
             Delete line
           </button>
-          
+
           <div class="overlay-toggle-group" id="overlay-toggle-group" style="display:none;">
             <label class="overlay-toggle">
               <input type="checkbox" id="show-polygons-checkbox" checked>
@@ -98,6 +100,32 @@
               <span>Baselines</span>
             </label>
           </div>
+
+
+
+          <button id="draw-baseline-btn" class="btn-draw-baseline" title="Draw new baseline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l6-6 4 4 8-8"/>
+              <circle cx="3" cy="17" r="1.5" fill="currentColor"/>
+              <circle cx="21" cy="7" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+
+          <div class="draw-baseline-actions" id="draw-baseline-actions" style="display:none;">
+            <button id="finish-baseline-btn" class="btn-bar-action confirm" title="Finish baseline">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+            <button id="cancel-baseline-btn" class="btn-bar-action cancel" title="Cancel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <button id="undo-segmentation-btn" class="btn-bar-action" title="Undo" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 14 4 9 9 4"/>
+              <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+            </svg>
+          </button>
 
 
           <button id="download-image-btn" class="btn-download-image" title="Download image">
@@ -286,12 +314,6 @@
                 <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p>
 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
-                <button class="btn-secondary" type="button" id="draw-baseline-btn">Draw new baseline</button>
-                <div class="draw-baseline-actions" id="draw-baseline-actions" style="display:none;">
-                  <button class="btn-primary" type="button" id="finish-baseline-btn">Finish baseline</button>
-                  <button class="btn-secondary" type="button" id="cancel-baseline-btn">Cancel</button>
-                </div>
-                <button class="btn-primary" type="button" id="save-segmentation-btn">Save changes</button>
                                 
 <!-- 
                 <button class="btn-primary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
