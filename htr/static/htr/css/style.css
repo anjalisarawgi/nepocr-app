@@ -272,8 +272,8 @@ nav {
 
 .crop-box {
   position: absolute;
-  border: 1.5px dashed #fff;
-  background: rgba(255,255,255,0.15);
+  border: 1.5px dashed #4A9EFF;
+  background: rgba(74,158,255,0.18);
   display: none;
 }
 
@@ -536,6 +536,15 @@ nav {
 }
 .btn-next-bar:hover { background: var(--accent); }
 .btn-next-bar svg { width: 13px; height: 13px; }
+
+.btn-next-bar:disabled {
+  background: var(--line-strong);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.btn-next-bar:disabled:hover {
+  background: var(--line-strong);
+}
 
 .before-after-toggle {
   display: flex;
@@ -823,4 +832,22 @@ nav {
 }
 .step-nav-row .btn-primary {
   flex: 1;
+}
+
+
+.crop-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #4A9EFF;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+.crop-handle[data-corner="nw"] { top: -6px; left: -6px; cursor: nwse-resize; }
+.crop-handle[data-corner="ne"] { top: -6px; right: -6px; cursor: nesw-resize; }
+.crop-handle[data-corner="sw"] { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.crop-handle[data-corner="se"] { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+.crop-box {
+  cursor: move;
 }
