@@ -367,40 +367,6 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 
 } // closes "if (cropBtn)"
 
-// let zoomLevel = 1;
-// let panX = 0;
-// let panY = 0;
-// let isPanning = false;
-// let panStart = { x: 0, y: 0 };
-// let mouseDownPos = null;
-// let didDrag = false;
-
-// function startPan(e) {
-//   mouseDownPos = { x: e.clientX, y: e.clientY };
-//   didDrag = false;
-//   if (zoomLevel <= 1) return;
-//   isPanning = true;
-//   panStart = { x: e.clientX - panX, y: e.clientY - panY };
-//   previewImage.style.cursor = 'grabbing';
-// }
-
-// previewImage.addEventListener('mousedown', startPan);
-// document.getElementById('line-overlay').addEventListener('mousedown', startPan);
-
-
-// document.addEventListener('mousemove', (e) => {
-//   if (!isPanning) return;
-//   panX = e.clientX - panStart.x;
-//   panY = e.clientY - panStart.y;
-//   applyZoom();
-// });
-
-// document.addEventListener('mouseup', () => {
-//   isPanning = false;
-//   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
-// });
-
-
 let zoomLevel = 1;
 let panX = 0;
 let panY = 0;
@@ -418,13 +384,11 @@ function startPan(e) {
   previewImage.style.cursor = 'grabbing';
 }
 
-document.querySelector('.preview-card').addEventListener('mousedown', startPan);
+previewImage.addEventListener('mousedown', startPan);
+document.getElementById('line-overlay').addEventListener('mousedown', startPan);
+
 
 document.addEventListener('mousemove', (e) => {
-  if (mouseDownPos) {
-    const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
-    if (dist > 4) didDrag = true;
-  }
   if (!isPanning) return;
   panX = e.clientX - panStart.x;
   panY = e.clientY - panStart.y;
@@ -433,9 +397,10 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mouseup', () => {
   isPanning = false;
-  mouseDownPos = null;
   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
 });
+
+
 
 document.getElementById('zoom-in-btn').addEventListener('click', () => {
   zoomLevel = Math.min(zoomLevel + 0.25, 8);
@@ -1041,8 +1006,8 @@ function renderDrawingPreview(livePoint) {
     preview.setAttribute('points', pts);
     preview.setAttribute('fill', 'none');
     preview.setAttribute('stroke', '#0D9488');
-    preview.setAttribute('stroke-width', 4 * scale);
-    if (livePoint) preview.setAttribute('stroke-dasharray', `${10 * scale} ${6 * scale}`);
+    preview.setAttribute('stroke-width', 6 * scale);
+    if (livePoint) preview.setAttribute('stroke-solid', `${10 * scale} ${6 * scale}`);
     preview.style.pointerEvents = 'none';
     lineOverlay.appendChild(preview);
 
