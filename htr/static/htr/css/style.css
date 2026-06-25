@@ -31,7 +31,7 @@ nav {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  height: 46px;
+  height: 44px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -59,8 +59,8 @@ nav {
 .workspace {
   display: grid;
   /* grid-template-columns:  220px 6px 50fr 35fr; */
-  grid-template-columns: 280px 6px 1fr 500px;
-  height: calc(100vh - 56px);
+  grid-template-columns: 280px 6px 1fr 550px;
+  height: calc(100vh - 46px);
 }
 
 .resize-handle {
@@ -508,8 +508,8 @@ nav {
 
 #preview-image {
   cursor: default;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,0.5)) drop-shadow(0 4px 20px rgba(0,0,0,0.6));
 }
-
 
 .toolbar-divider {
   width: 1px;
@@ -758,3 +758,22 @@ nav {
 }
 .btn-bar-action:hover { background: var(--panel-bg); color: var(--ink); }
 .btn-bar-action svg { width: 14px; height: 14px; }
+
+
+.credit-text {
+  font-size: 11px;
+  color: var(--ink);
+  margin-top: -8px;
+  line-height: 1.4;
+}
+
+.credit-text a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-faint);
+}
+
+.credit-text a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}

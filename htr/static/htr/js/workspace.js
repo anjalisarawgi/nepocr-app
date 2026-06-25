@@ -541,7 +541,7 @@ function renderOverlay() {
       const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygon.setAttribute('points', points);
       polygon.setAttribute('fill', selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
-      polygon.setAttribute('stroke', '#191919');
+      polygon.setAttribute('stroke', '#1E3A5F');
       polygon.setAttribute('stroke-width', (selectedIndices.has(index) ? 2.5 : 0) * scale);
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = 'pointer';
@@ -597,7 +597,7 @@ function renderOverlay() {
         square.setAttribute('width', size);
         square.setAttribute('height', size);
         square.setAttribute('fill', 'rgba(255,255,255,0.85)');
-        square.setAttribute('stroke', '#191919');
+        square.setAttribute('stroke', '#1E3A5F');
         square.setAttribute('stroke-width', 2 * scale);
         square.style.pointerEvents = 'auto';
         square.style.cursor = 'grab';
