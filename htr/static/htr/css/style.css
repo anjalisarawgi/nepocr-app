@@ -929,3 +929,30 @@ nav {
 }
 .ocr-token:hover::after { opacity: 0.95; }
 
+.btn-download-txt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 8px 14px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-download-txt:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-download-txt svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}

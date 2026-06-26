@@ -625,6 +625,11 @@ document.getElementById('run-segmentation-btn').addEventListener('click', () => 
 
 // kraken
 document.getElementById('run-segmentation-model-btn').addEventListener('click', () => {
+  if (segmentationLines.length > 0) {
+    const confirmed = confirm('This will replace your existing segmentation lines. Continue?');
+    if (!confirmed) return;
+  }
+
   document.getElementById('processing-overlay').style.display = 'flex';
 
   fetch(`/segment/${currentDocId}/`, {
@@ -650,6 +655,8 @@ let selectedIndices = new Set();
 let overlayPageWidth, overlayPageHeight;
 let showPolygons = true;
 let showBaselines = true;
+const isReadOnlyOverlay = docStatus === 'ocr_done';
+
 
 function getOverlayScale() {
   const referenceWidth = 1500;
@@ -695,22 +702,24 @@ function renderOverlay() {
       polygon.setAttribute('fill', selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
       polygon.setAttribute('stroke', '#1E3A5F');
       polygon.setAttribute('stroke-width', (selectedIndices.has(index) ? 2.5 : 0) * scale);
-      polygon.style.pointerEvents = 'auto';
-      polygon.style.cursor = 'pointer';
-      polygon.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (didDrag) return;
-        if (e.metaKey || e.ctrlKey) {
-          if (selectedIndices.has(index)) {
-            selectedIndices.delete(index);
+      polygon.style.pointerEvents = isReadOnlyOverlay ? 'none' : 'auto';
+      polygon.style.cursor = isReadOnlyOverlay ? 'default' : 'pointer';
+      if (!isReadOnlyOverlay) {
+        polygon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (didDrag) return;
+          if (e.metaKey || e.ctrlKey) {
+            if (selectedIndices.has(index)) {
+              selectedIndices.delete(index);
+            } else {
+              selectedIndices.add(index);
+            }
           } else {
-            selectedIndices.add(index);
+            selectedIndices = new Set([index]);
           }
-        } else {
-          selectedIndices = new Set([index]);
-        }
-        renderOverlay();
-      });
+          renderOverlay();
+        });
+      }
       svg.appendChild(polygon);
     }
 
@@ -737,10 +746,11 @@ function renderOverlay() {
     }
   });
 
-  selectedIndices.forEach((selIndex) => {
-    if (!segmentationLines[selIndex]) return;
-  
-    if (showPolygons) {
+  if (!isReadOnlyOverlay) {
+    selectedIndices.forEach((selIndex) => {
+      if (!segmentationLines[selIndex]) return;
+    
+      if (showPolygons) {
       segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
         const size = 14 * scale;
         const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -782,8 +792,8 @@ function renderOverlay() {
       });
     }
   });
-  
-  document.getElementById('delete-line-btn').style.display = selectedIndices.size > 0 ? 'flex' : 'none';
+}
+document.getElementById('delete-line-btn').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
 }
 
 
@@ -1069,6 +1079,7 @@ finishBaselineBtn.addEventListener('click', () => {
 let segmentationHistory = [];
 
 function pushHistory() {
+  if (isReadOnlyOverlay) return;
   segmentationHistory.push(JSON.parse(JSON.stringify(segmentationLines)));
   if (segmentationHistory.length > 30) segmentationHistory.shift();
   document.getElementById('undo-segmentation-btn').style.display = 'flex';
@@ -1128,6 +1139,19 @@ document.getElementById('back-to-segmentation-btn').addEventListener('click', ()
 
 
 // OCR 
+const confidenceCheckbox = document.getElementById('show-confidence-checkbox');
+
+function applyConfidenceVisibility() {
+  const showConfidence = confidenceCheckbox.checked;
+  document.querySelectorAll('.ocr-line-text').forEach((el) => {
+    el.innerHTML = showConfidence ? el.dataset.html : el.dataset.plain;
+  });
+}
+
+confidenceCheckbox.addEventListener('change', applyConfidenceVisibility);
+applyConfidenceVisibility();
+
+
 document.getElementById('run-ocr-btn').addEventListener('click', () => {
   document.getElementById('processing-overlay').style.display = 'flex';
 
@@ -1143,15 +1167,25 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
         data.predictions.forEach((pred, i) => {
           const row = document.createElement('div');
           row.className = 'ocr-line-result';
-          row.innerHTML = `<span class="ocr-line-number">${i + 1}</span><span class="ocr-line-text">${pred.html}</span>`;
+          const textSpan = document.createElement('span');
+          textSpan.className = 'ocr-line-text';
+          textSpan.dataset.html = pred.html;
+          textSpan.dataset.plain = pred.text;
+          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
+    
+          const numberSpan = document.createElement('span');
+          numberSpan.className = 'ocr-line-number';
+          numberSpan.textContent = i + 1;
+    
+          row.appendChild(numberSpan);
+          row.appendChild(textSpan);
           resultsDiv.appendChild(row);
         });
         document.getElementById('download-ocr-btn').style.display = 'block';
+        document.getElementById('confidence-toggle-row').style.display = 'flex';
       }
     })
     .finally(() => {
       document.getElementById('processing-overlay').style.display = 'none';
     });
 });
-
-
