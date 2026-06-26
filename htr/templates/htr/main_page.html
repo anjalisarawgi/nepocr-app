@@ -164,7 +164,10 @@
         </div>
         <svg id="line-overlay" style="position:absolute; top:38px; left:0; width:100%; height:calc(100% - 38px); display:none; pointer-events:none;"></svg>
 
-      
+        <div id="readonly-toast" class="readonly-toast" style="display:none;">
+          This is not editable here. Go back to Step 2: Line Segmentation to edit.
+        </div>
+        
         <div class="zoom-toolbar" id="zoom-toolbar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
 
           <button id="zoom-out-btn" class="zoom-btn" title="Zoom out">
@@ -383,7 +386,16 @@
                 <!-- </div> -->
                 <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegemented cannot be predicted. We also report the model confidence along with the ocr predictions. </p>
                 <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
-                
+
+                <div id="ocr-stale-warning" class="ocr-stale-warning" style="display: {% if selected_doc.ocr_stale %}flex{% else %}none{% endif %};">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  Segmentation has changed since this transcription was run. Click "Run OCR" again to update the results.
+                </div>
+
                 <label class="overlay-toggle" id="confidence-toggle-row" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
                   <input type="checkbox" id="show-confidence-checkbox" checked>
                   <span>Show model confidence</span>
@@ -392,9 +404,10 @@
                 <div id="ocr-results" class="ocr-results">
                   {% if selected_doc.ocr_predictions %}
                     {% for pred in selected_doc.ocr_predictions %}
-                      <div class="ocr-line-result">
+                      <div class="ocr-line-result" data-line-index="{{ pred.line_index }}">
                         <span class="ocr-line-number">{{ forloop.counter }}</span>
-                        <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>                      </div>
+                        <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>
+                      </div>
                     {% endfor %}
                   {% endif %}
                 </div>

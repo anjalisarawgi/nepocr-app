@@ -235,6 +235,8 @@ def run_segmentation(request, pk):
 
         
         image.line_coordinates = lines
+        if image.ocr_predictions:
+            image.ocr_stale = True
         image.save()
 
         return JsonResponse({
@@ -256,10 +258,11 @@ def save_segmentation(request, pk):
         image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
         data = json.loads(request.body)
         image.line_coordinates = data.get('lines', [])
+        if image.ocr_predictions:
+            image.ocr_stale = True
         image.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
-
 
 
 from django.http import HttpResponse
@@ -509,6 +512,7 @@ def run_ocr(request, pk):
             predictions.append({'line_index': idx, 'text': text, 'html': html})
             
         image.ocr_predictions = predictions
+        image.ocr_stale = False
         image.save()
 
         return JsonResponse({'success': True, 'predictions': predictions})

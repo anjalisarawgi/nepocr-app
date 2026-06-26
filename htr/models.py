@@ -29,6 +29,8 @@ class UploadedImage(models.Model):
     preprocessing_settings = models.JSONField(default=dict, blank=True)
     line_coordinates = models.JSONField(default=list, blank=True)
     ocr_predictions = models.JSONField(default=list, blank=True)
+    ocr_stale = models.BooleanField(default=False)
+
 
 
     @property

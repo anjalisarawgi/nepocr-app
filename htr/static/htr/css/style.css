@@ -956,3 +956,45 @@ nav {
   height: 15px;
   flex: 0 0 auto;
 }
+
+
+.ocr-stale-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #FEF3E2;
+  border: 1px solid #F5C168;
+  color: #92611A;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.ocr-stale-warning svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+
+.readonly-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(35,35,37,0.92);
+  color: #F1F1F1;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 8px;
+  z-index: 4;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.readonly-toast.visible {
+  opacity: 1;
+}

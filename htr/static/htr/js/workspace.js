@@ -378,11 +378,11 @@ let didDrag = false;
 function startPan(e) {
   mouseDownPos = { x: e.clientX, y: e.clientY };
   didDrag = false;
-  if (zoomLevel <= 1) return;
   isPanning = true;
   panStart = { x: e.clientX - panX, y: e.clientY - panY };
   previewImage.style.cursor = 'grabbing';
 }
+
 
 previewImage.addEventListener('mousedown', startPan);
 document.getElementById('line-overlay').addEventListener('mousedown', startPan);
@@ -436,8 +436,7 @@ function getTouchDistance(touches) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-
-previewImage.addEventListener('wheel', (e) => {
+function handleWheel(e) {
   e.preventDefault();
 
   if (e.ctrlKey || e.metaKey) {
@@ -449,12 +448,18 @@ previewImage.addEventListener('wheel', (e) => {
     }
     applyZoom();
   } else if (zoomLevel > 1) {
-    panX -= e.deltaX;
-    panY -= e.deltaY;
+    if (e.shiftKey && e.deltaX === 0) {
+      panX -= e.deltaY;
+    } else {
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+    }
     applyZoom();
   }
-}, { passive: false });
+}
 
+// previewImage.addEventListener('wheel', handleWheel, { passive: false });
+document.getElementById('preview-card').addEventListener('wheel', handleWheel, { passive: false });
 
 // 
 document.getElementById('next-step-btn').addEventListener('click', () => {
@@ -652,6 +657,8 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
 
 let segmentationLines = [];
 let selectedIndices = new Set();
+let hoveredLineIndex = null;
+
 let overlayPageWidth, overlayPageHeight;
 let showPolygons = true;
 let showBaselines = true;
@@ -697,13 +704,14 @@ function renderOverlay() {
       polygonHalo.style.pointerEvents = 'none';
       svg.appendChild(polygonHalo);
 
+      const isHovered = index === hoveredLineIndex;
       const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygon.setAttribute('points', points);
-      polygon.setAttribute('fill', selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)');
-      polygon.setAttribute('stroke', '#1E3A5F');
-      polygon.setAttribute('stroke-width', (selectedIndices.has(index) ? 2.5 : 0) * scale);
-      polygon.style.pointerEvents = isReadOnlyOverlay ? 'none' : 'auto';
-      polygon.style.cursor = isReadOnlyOverlay ? 'default' : 'pointer';
+      polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)'));
+      polygon.setAttribute('stroke', isHovered ? 'none' : '#1E3A5F');
+      polygon.setAttribute('stroke-width', (isHovered ? 0 : (selectedIndices.has(index) ? 2.5 : 0)) * scale);
+      polygon.style.pointerEvents = 'auto';
+      polygon.style.cursor = isReadOnlyOverlay ? 'not-allowed' : 'pointer';
       if (!isReadOnlyOverlay) {
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -718,6 +726,12 @@ function renderOverlay() {
             selectedIndices = new Set([index]);
           }
           renderOverlay();
+        });
+      } else {
+        polygon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (didDrag) return;
+          showReadOnlyToast();
         });
       }
       svg.appendChild(polygon);
@@ -797,7 +811,19 @@ document.getElementById('delete-line-btn').style.display = (!isReadOnlyOverlay &
 }
 
 
-
+let toastTimeout;
+function showReadOnlyToast() {
+  const toast = document.getElementById('readonly-toast');
+  toast.style.display = 'block';
+  toast.classList.add('visible');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 200);
+  }, 2200);
+}
 
 if (savedLines && savedLines.length > 0 && (docStatus === 'segmented' || docStatus === 'ocr_done')) {
   drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
@@ -813,6 +839,30 @@ document.getElementById('show-baselines-checkbox').addEventListener('change', (e
 });
 
 //
+function setupOcrHoverHighlight() {
+  const resultsDiv = document.getElementById('ocr-results');
+  if (!resultsDiv) return;
+
+  resultsDiv.addEventListener('mouseover', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    const idx = parseInt(row.dataset.lineIndex, 10);
+    if (!isNaN(idx)) {
+      hoveredLineIndex = idx;
+      renderOverlay();
+    }
+  });
+
+  resultsDiv.addEventListener('mouseout', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    hoveredLineIndex = null;
+    renderOverlay();
+  });
+}
+
+setupOcrHoverHighlight();
+
 function startVertexDrag(e, lineIndex, vertexIndex, type) {
   e.stopPropagation();
   e.preventDefault();
@@ -1167,6 +1217,7 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
         data.predictions.forEach((pred, i) => {
           const row = document.createElement('div');
           row.className = 'ocr-line-result';
+          row.dataset.lineIndex = pred.line_index;
           const textSpan = document.createElement('span');
           textSpan.className = 'ocr-line-text';
           textSpan.dataset.html = pred.html;
@@ -1183,9 +1234,13 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
         });
         document.getElementById('download-ocr-btn').style.display = 'block';
         document.getElementById('confidence-toggle-row').style.display = 'flex';
+        document.getElementById('ocr-stale-warning').style.display = 'none';
+
       }
     })
     .finally(() => {
       document.getElementById('processing-overlay').style.display = 'none';
     });
 });
+
+
