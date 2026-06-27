@@ -907,10 +907,16 @@ nav {
   font-weight: 600;
   flex: 0 0 auto;
   width: 20px;
+  align-self: flex-start;
 }
-/* .ocr-line-text {
-  font-family: var(--serif);
-} */
+.ocr-line-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
 
 .ocr-token { cursor: help; position: relative; display: inline; text-decoration: underline; text-decoration-thickness: 2px; }
 .conf-red    { text-decoration-color: rgba(220,38,38,0.9); }
