@@ -38,7 +38,7 @@
          </svg>
          <span class="doc-text">
            <span class="doc-name">{{ doc.filename }}</span>
-           <span class="doc-updated">{{ doc.updated_at }}</span>
+           <span class="doc-updated">{{ doc.uploaded_at|date:"F j, Y" }}</span>
          </span>
          <form method="post" action="{% url 'delete_image' doc.id %}" class="delete-form" onsubmit="return confirm('Delete this document?');">
           {% csrf_token %}
@@ -362,19 +362,19 @@
                   <p class="placeholder-text" style="margin-bottom:4px;">Select a line, then adjust its padding:</p>
                   <div class="padding-row">
                     <span class="padding-label">Top</span>
-                    <input type="range" id="padding-top" min="-300" max="300" value="0">
+                    <input type="range" id="padding-top" min="-500" max="500" value="0">
                   </div>
                   <div class="padding-row">
                     <span class="padding-label">Bottom</span>
-                    <input type="range" id="padding-bottom" min="-300" max="300" value="0">
+                    <input type="range" id="padding-bottom" min="-500" max="500" value="0">
                   </div>
                   <div class="padding-row">
                     <span class="padding-label">Left</span>
-                    <input type="range" id="padding-left" min="-300" max="300" value="0">
+                    <input type="range" id="padding-left" min="-500" max="500" value="0">
                   </div>
                   <div class="padding-row">
                     <span class="padding-label">Right</span>
-                    <input type="range" id="padding-right" min="-300" max="300" value="0">
+                    <input type="range" id="padding-right" min="-500" max="500" value="0">
                   </div>
                 </div>
 
@@ -413,63 +413,57 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <!-- <div class="subtabs"> -->
-                  <!-- <div class="subtab active">OCR</div> -->
-                  <!-- <div class="subtab">Dictionary matching</div> -->
-                  <!-- <div class="subtab">Confidence intervals</div> -->
-                <!-- </div> -->
-                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegemented cannot be predicted. We also report the model confidence along with the ocr predictions. </p>
-                <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
-
-                <div id="ocr-stale-warning" class="ocr-stale-warning" style="display: {% if selected_doc.ocr_stale %}flex{% else %}none{% endif %};">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
-                  Segmentation has changed since this transcription was run. Click "Run OCR" again to update the results.
+                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. We also report the model confidence along with the ocr predictions.</p>
+              
+                <div class="ocr-action-zone">
+                  <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
+              
+                  <div id="ocr-stale-warning" class="ocr-stale-warning" style="display: {% if selected_doc.ocr_stale %}flex{% else %}none{% endif %};">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Segmentation has changed since this transcription was run. Click "Run OCR" again to update the results.
+                  </div>
                 </div>
-
-                <label class="overlay-toggle" id="confidence-toggle-row" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
-                  <input type="checkbox" id="show-confidence-checkbox" checked>
-                  <span>Show model confidence</span>
-                </label>
-
-                <div id="ocr-results" class="ocr-results">
-                  {% if selected_doc.ocr_predictions %}
-                    {% for pred in selected_doc.ocr_predictions %}
-                      <div class="ocr-line-result" data-line-index="{{ pred.line_index }}">
-                        <span class="ocr-line-number">{{ forloop.counter }}</span>
-                        <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>
-                      </div>
-                    {% endfor %}
+              
+                <div class="ocr-results-panel" id="ocr-results-panel" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
+                  <div class="ocr-results-header">
+                    <span class="ocr-results-title">Transcription</span>
+                    <label class="overlay-toggle" id="confidence-toggle-row">
+                      <input type="checkbox" id="show-confidence-checkbox" checked>
+                      <span>Show model confidence</span>
+                    </label>
+                  </div>
+              
+                  <div id="ocr-results" class="ocr-results">
+                    {% if selected_doc.ocr_predictions %}
+                      {% for pred in selected_doc.ocr_predictions %}
+                        <div class="ocr-line-result" data-line-index="{{ pred.line_index }}">
+                          <span class="ocr-line-number">{{ forloop.counter }}</span>
+                          <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    {% endif %}
+                  </div>
+              
+                  {% if selected_doc %}
+                  <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-download-txt" id="download-ocr-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="11" x2="12" y2="17"/>
+                      <polyline points="9 14 12 17 15 14"/>
+                    </svg>
+                    Download transcription (.txt)
+                  </a>
                   {% endif %}
                 </div>
-                
-                {% if selected_doc %}
-                <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-download-txt" id="download-ocr-btn" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="11" x2="12" y2="17"/>
-                    <polyline points="9 14 12 17 15 14"/>
-                  </svg>
-                  Download transcription (.txt)
-                </a>
-                {% endif %}
               
-                <!-- <button class="btn-primary" type="button" id="back-to-segmentation-btn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                  ← Previous Step
-                </button> -->
-
                 <div class="step-nav-row">
-                  <button class="btn-primary" type="button" id="back-to-segmentation-btn">
-                    ← Previous Step
-                  </button>
+                  <button class="btn-primary" type="button" id="back-to-segmentation-btn">← Previous Step</button>
                 </div>
-    
-
               </div>
             </div>
           </div>
@@ -491,6 +485,15 @@
 
   </div>
 
+  <div id="line-popup-backdrop" class="line-popup-backdrop" style="display:none;">
+    <div class="line-popup-card">
+      <button id="line-popup-close" class="line-popup-close" type="button">&times;</button>
+      <img id="line-popup-img" alt="Line crop">
+      <div class="line-popup-divider"></div>
+      <div id="line-popup-text" class="line-popup-text"></div>
+    </div>
+  </div>
+  
   <script>
     let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
     let lockedImageUrl = {% if selected_doc.locked_image %}"{{ selected_doc.locked_image.url }}"{% else %}null{% endif %};

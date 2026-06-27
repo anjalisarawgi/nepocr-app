@@ -1363,8 +1363,7 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           row.appendChild(textSpan);
           resultsDiv.appendChild(row);
         });
-        document.getElementById('download-ocr-btn').style.display = 'block';
-        document.getElementById('confidence-toggle-row').style.display = 'flex';
+        document.getElementById('ocr-results-panel').style.display = 'flex'; 
         document.getElementById('ocr-stale-warning').style.display = 'none';
 
       }
@@ -1392,5 +1391,117 @@ function deselectIfEmpty(e) {
 
 previewImage.addEventListener('click', deselectIfEmpty);
 document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
+
+let currentPopupText = '';
+let currentPopupHtml = '';
+
+function openLinePreviewPopup(lineIndex, predText, predHtml) {
+  const line = segmentationLines[lineIndex];
+  if (!line || !line.polygon || line.polygon.length < 3) return;
+
+  const polygon = line.polygon;
+  const xs = polygon.map(p => p[0]);
+  const ys = polygon.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  // Wider padding than before, so there's visible context around the polygon.
+  const padX = (maxX - minX) * 0.25 + 10;
+  const padY = (maxY - minY) * 0.6 + 10;
+  const cropX = Math.max(0, minX - padX);
+  const cropY = Math.max(0, minY - padY);
+  const cropW = Math.min(previewImage.naturalWidth - cropX, (maxX - minX) + padX * 2);
+  const cropH = Math.min(previewImage.naturalHeight - cropY, (maxY - minY) + padY * 2);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cropW;
+  canvas.height = cropH;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Draw the full crop region at normal brightness — gives surrounding context.
+  ctx.drawImage(previewImage, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+  // 2. Dim everything...
+  ctx.save();
+  ctx.fillStyle = 'rgba(20,20,20,0.6)';
+  ctx.fillRect(0, 0, cropW, cropH);
+  ctx.restore();
+
+  // 3. ...except re-draw the polygon region at full brightness, so it "pops"
+  //    against the dimmed surroundings. This is the exact region used for the prediction.
+  ctx.save();
+  ctx.beginPath();
+  polygon.forEach((p, i) => {
+    const x = p[0] - cropX;
+    const y = p[1] - cropY;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(previewImage, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+  ctx.restore();
+
+  // 4. Outline the polygon so the boundary is unambiguous.
+  ctx.beginPath();
+  polygon.forEach((p, i) => {
+    const x = p[0] - cropX;
+    const y = p[1] - cropY;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(30,144,255,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  document.getElementById('line-popup-img').src = canvas.toDataURL('image/png');
+  document.getElementById('line-popup-text').innerHTML =
+    confidenceCheckbox.checked ? predHtml : predText;
+  
+  // Wait a tick for the image to lay out before measuring its width.
+  requestAnimationFrame(() => fitTextToImageWidth(predText));
+  
+  document.getElementById('line-popup-backdrop').style.display = 'flex';
+}
+
+function setupOcrClickPopup() {
+  const resultsDiv = document.getElementById('ocr-results');
+  if (!resultsDiv) return;
+
+  resultsDiv.addEventListener('click', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    const idx = parseInt(row.dataset.lineIndex, 10);
+    if (isNaN(idx)) return;
+    const textSpan = row.querySelector('.ocr-line-text');
+    openLinePreviewPopup(idx, textSpan.dataset.plain, textSpan.dataset.html);
+  });
+}
+setupOcrClickPopup();
+
+document.getElementById('line-popup-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'line-popup-backdrop' || e.target.id === 'line-popup-close') {
+    document.getElementById('line-popup-backdrop').style.display = 'none';
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('line-popup-backdrop').style.display = 'none';
+  }
+});
+
+function fitTextToImageWidth(text) {
+  const popupImg = document.getElementById('line-popup-img');
+  const textEl = document.getElementById('line-popup-text');
+
+  const charCount = Math.max(text.replace(/\s/g, '').length, 1);
+  const availableWidth = (popupImg.clientWidth || popupImg.naturalWidth) * 0.92; // leave a little margin
+
+  const avgGlyphWidthFactor = 0.75;
+  let fontSize = availableWidth / (charCount * avgGlyphWidthFactor);
+  fontSize = Math.min(Math.max(fontSize, 18), 40); // tighter ceiling than before
+
+  textEl.style.fontSize = fontSize + 'px';
+}
 
 
