@@ -41,7 +41,7 @@ def upload_image(request, pk = None):
             instance = form.save(commit=False)  # create an instance of the UploadedImage model but dont save it to the database yet
             instance.user = request.user
             instance.save()
-            return redirect('main_page')
+            return redirect('view_image', pk=instance.pk)  
     else:
         form = ImageUploadForm()
 
@@ -482,13 +482,12 @@ def run_ocr(request, pk):
                 row_bucket = round(min_y / Y_TOLERANCE)
                 return (0, row_bucket, min_x)
 
-        sorted_lines = sorted(lines, key=line_sort_key)
-
-
+        indexed_lines = list(enumerate(lines))
+        sorted_indexed_lines = sorted(indexed_lines, key=lambda item: line_sort_key(item[1]))
 
         predictions = []
 
-        for idx, line in enumerate(sorted_lines):
+        for original_idx, line in sorted_indexed_lines:
             polygon = line.get('polygon', [])
             if len(polygon) < 3:
                 continue
@@ -509,7 +508,7 @@ def run_ocr(request, pk):
             crop = seg_img.crop(crop_box)
 
             text, html = predict_line_with_confidence(crop)
-            predictions.append({'line_index': idx, 'text': text, 'html': html})
+            predictions.append({'line_index': original_idx, 'text': text, 'html': html})
             
         image.ocr_predictions = predictions
         image.ocr_stale = False

@@ -32,13 +32,24 @@ document.querySelectorAll('.export-chip').forEach((chip) => {
 
 
 // Resizable sidebar
+
 const handle = document.getElementById('resize-handle');
+const handleRight = document.getElementById('resize-handle-right');
 const workspace = document.querySelector('.workspace');
 let isDragging = false;
+let isDraggingRight = false;
+
+let currentSidebarWidth = 280;
+let currentRightWidth = 550;
 
 handle.addEventListener('mousedown', () => {
   isDragging = true;
   handle.classList.add('dragging');
+});
+
+handleRight.addEventListener('mousedown', () => {
+  isDraggingRight = true;
+  handleRight.classList.add('dragging');
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -46,18 +57,37 @@ document.addEventListener('mousemove', (e) => {
     const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
     if (dist > 4) didDrag = true;
   }
+
+  if (isDragging) {
+    currentSidebarWidth = Math.min(Math.max(e.clientX, 160), 480);
+    workspace.style.gridTemplateColumns = `${currentSidebarWidth}px 6px 1fr 6px ${currentRightWidth}px`;
+  }
+
+  if (isDraggingRight) {
+    const distanceFromRight = window.innerWidth - e.clientX;
+    currentRightWidth = Math.min(Math.max(distanceFromRight, 320), 800);
+    workspace.style.gridTemplateColumns = `${currentSidebarWidth}px 6px 1fr 6px ${currentRightWidth}px`;
+  }
+
   if (!isPanning) return;
   panX = e.clientX - panStart.x;
   panY = e.clientY - panStart.y;
   applyZoom();
 });
 
-
-
 document.addEventListener('mouseup', () => {
   isPanning = false;
   mouseDownPos = null;
   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+
+  if (isDragging) {
+    isDragging = false;
+    handle.classList.remove('dragging');
+  }
+  if (isDraggingRight) {
+    isDraggingRight = false;
+    handleRight.classList.remove('dragging');
+  }
 });
 
 document.addEventListener('keydown', (e) => {
@@ -615,6 +645,78 @@ beforeBtn.addEventListener('click', () => setMode('before'));
 afterBtn.addEventListener('click', () => setMode('after'));
 
 // segmentation
+
+
+const paddingControls = document.getElementById('padding-controls');
+const paddingTop = document.getElementById('padding-top');
+const paddingBottom = document.getElementById('padding-bottom');
+const paddingLeft = document.getElementById('padding-left');
+const paddingRight = document.getElementById('padding-right');
+
+let basePolygons = {};
+
+function captureBasePolygons() {
+  basePolygons = {};
+  selectedIndices.forEach((idx) => {
+    if (segmentationLines[idx]) {
+      basePolygons[idx] = segmentationLines[idx].polygon.map(p => [p[0], p[1]]);
+    }
+  });
+}
+
+function applyPadding() {
+  const top = parseFloat(paddingTop.value);
+  const bottom = parseFloat(paddingBottom.value);
+  const left = parseFloat(paddingLeft.value);
+  const right = parseFloat(paddingRight.value);
+
+  selectedIndices.forEach((idx) => {
+    const base = basePolygons[idx];
+    if (!base) return;
+
+    const xs = base.map(p => p[0]);
+    const ys = base.map(p => p[1]);
+    const midX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+    segmentationLines[idx].polygon = base.map(([x, y]) => {
+      let newX = x;
+      let newY = y;
+      if (y < midY) newY = y - top;
+      else newY = y + bottom;
+      if (x < midX) newX = x - left;
+      else newX = x + right;
+      return [newX, newY];
+    });
+  });
+
+  renderOverlay();
+}
+
+let paddingDebounce;
+function debouncedApplyPadding() {
+  clearTimeout(paddingDebounce);
+  paddingDebounce = setTimeout(() => {
+    autoSaveSegmentation();
+  }, 400);
+}
+
+[paddingTop, paddingBottom, paddingLeft, paddingRight].forEach((slider) => {
+  slider.addEventListener('mousedown', () => {
+    pushHistory();
+    isAdjustingPadding = true;
+    renderOverlay();
+  });
+  slider.addEventListener('input', () => {
+    applyPadding();
+    debouncedApplyPadding();
+  });
+  slider.addEventListener('mouseup', () => {
+    isAdjustingPadding = false;
+    renderOverlay();
+  });
+});
+
 document.getElementById('run-segmentation-btn').addEventListener('click', () => {
   fetch(`/advance-segmentation/${currentDocId}/`, {
     method: 'POST',
@@ -658,6 +760,7 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
 let segmentationLines = [];
 let selectedIndices = new Set();
 let hoveredLineIndex = null;
+let isAdjustingPadding = false;
 
 let overlayPageWidth, overlayPageHeight;
 let showPolygons = true;
@@ -685,6 +788,7 @@ function drawLineOverlay(lines, pageWidth, pageHeight) {
 }
 
 function renderOverlay() {
+  
   const svg = document.getElementById('line-overlay');
   svg.setAttribute('viewBox', `0 0 ${overlayPageWidth} ${overlayPageHeight}`);
   svg.innerHTML = '';
@@ -709,7 +813,7 @@ function renderOverlay() {
       polygon.setAttribute('points', points);
       polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)'));
       polygon.setAttribute('stroke', isHovered ? 'none' : '#1E3A5F');
-      polygon.setAttribute('stroke-width', (isHovered ? 0 : (selectedIndices.has(index) ? 2.5 : 0)) * scale);
+      polygon.setAttribute('stroke-width', (isHovered ? 0 : (selectedIndices.has(index) ? 1.5 : 0)) * scale);
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = isReadOnlyOverlay ? 'not-allowed' : 'pointer';
       if (!isReadOnlyOverlay) {
@@ -725,6 +829,13 @@ function renderOverlay() {
           } else {
             selectedIndices = new Set([index]);
           }
+          if (paddingTop) {
+            paddingTop.value = 0;
+            paddingBottom.value = 0;
+            paddingLeft.value = 0;
+            paddingRight.value = 0;
+            captureBasePolygons();
+          }
           renderOverlay();
         });
       } else {
@@ -739,20 +850,11 @@ function renderOverlay() {
 
     if (showBaselines && line.baseline && line.baseline.length > 0) {
       const baselinePoints = line.baseline.map(p => p.join(',')).join(' ');
-
-      const baselineHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-      baselineHalo.setAttribute('points', baselinePoints);
-      baselineHalo.setAttribute('fill', 'none');
-      baselineHalo.setAttribute('stroke', '#ffffff');
-      baselineHalo.setAttribute('stroke-width', 6 * scale);
-      baselineHalo.setAttribute('stroke-opacity', '0.55');
-      baselineHalo.style.pointerEvents = 'none';
-      svg.appendChild(baselineHalo);
-
+    
       const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
       baseline.setAttribute('points', baselinePoints);
       baseline.setAttribute('fill', 'none');
-      baseline.setAttribute('stroke', '#E0117D');
+      baseline.setAttribute('stroke', '#9F1239');
       baseline.setAttribute('stroke-width', 4 * scale);
       baseline.setAttribute('stroke-solid', `${8 * scale} ${3 * scale}`);
       baseline.style.pointerEvents = 'none';
@@ -760,7 +862,7 @@ function renderOverlay() {
     }
   });
 
-  if (!isReadOnlyOverlay) {
+  if (!isReadOnlyOverlay && !isAdjustingPadding) {
     selectedIndices.forEach((selIndex) => {
       if (!segmentationLines[selIndex]) return;
     
@@ -775,6 +877,8 @@ function renderOverlay() {
         square.setAttribute('fill', 'rgba(255,255,255,0.85)');
         square.setAttribute('stroke', '#1E3A5F');
         square.setAttribute('stroke-width', 2 * scale);
+        square.classList.add('overlay-handle');
+        square.style.transformOrigin = `${point[0]}px ${point[1]}px`;
         square.style.pointerEvents = 'auto';
         square.style.cursor = 'grab';
         square.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'polygon'));
@@ -797,8 +901,10 @@ function renderOverlay() {
         rect.setAttribute('width', width);
         rect.setAttribute('height', height);
         rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
-        rect.setAttribute('stroke', '#E0117D');
+        rect.setAttribute('stroke', '#9F1239');
         rect.setAttribute('stroke-width', 2.5 * scale);
+        rect.classList.add('overlay-handle');
+        rect.style.transformOrigin = `${point[0]}px ${point[1]}px`;
         rect.style.pointerEvents = 'auto';
         rect.style.cursor = 'grab';
         rect.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'baseline'));
@@ -806,8 +912,14 @@ function renderOverlay() {
       });
     }
   });
+  
+  updateHandleCounterScale();
+
+
 }
 document.getElementById('delete-line-btn').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
+document.getElementById('padding-controls').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
+
 }
 
 
@@ -825,9 +937,13 @@ function showReadOnlyToast() {
   }, 2200);
 }
 
+overlayPageWidth = savedPageWidth;
+overlayPageHeight = savedPageHeight;
+
 if (savedLines && savedLines.length > 0 && (docStatus === 'segmented' || docStatus === 'ocr_done')) {
   drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
 }
+
 document.getElementById('show-polygons-checkbox').addEventListener('change', (e) => {
   showPolygons = e.target.checked;
   renderOverlay();
@@ -914,9 +1030,11 @@ function autoSaveSegmentation() {
     .then((data) => {
       if (data.success) {
         const status = document.getElementById('segmentation-save-status');
-        status.textContent = 'Saved';
-        status.classList.add('visible');
-        setTimeout(() => status.classList.remove('visible'), 1200);
+        if (status) {
+          status.textContent = 'Saved';
+          status.classList.add('visible');
+          setTimeout(() => status.classList.remove('visible'), 1200);
+        }
       }
     });
 }
@@ -926,6 +1044,12 @@ function debouncedSaveSegmentation() {
   segmentationSaveDebounce = setTimeout(autoSaveSegmentation, 600);
 }
 
+function updateHandleCounterScale() {
+  const counterScale = 1 / Math.sqrt(Math.max(zoomLevel, 0.5));
+  document.querySelectorAll('.overlay-handle').forEach((el) => {
+    el.style.transform = `scale(${counterScale})`;
+  });
+}
 
 function applyZoom() {
   const transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
@@ -936,6 +1060,8 @@ function applyZoom() {
     lineOverlay.style.transform = transform;
     lineOverlay.style.transformOrigin = previewImage.style.transformOrigin || 'center center';
   }
+
+  updateHandleCounterScale();
 }
 
 document.getElementById('download-image-btn').addEventListener('click', () => {
@@ -946,6 +1072,8 @@ document.getElementById('download-image-btn').addEventListener('click', () => {
   link.click();
   document.body.removeChild(link);
 });
+
+
 
 
 //// draw baseline
@@ -1066,7 +1194,7 @@ function renderDrawingPreview(livePoint) {
     const preview = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
     preview.setAttribute('points', pts);
     preview.setAttribute('fill', 'none');
-    preview.setAttribute('stroke', '#0D9488');
+    preview.setAttribute('stroke', '#15803D');
     preview.setAttribute('stroke-width', 6 * scale);
     if (livePoint) preview.setAttribute('stroke-solid', `${10 * scale} ${6 * scale}`);
     preview.style.pointerEvents = 'none';
@@ -1077,7 +1205,7 @@ function renderDrawingPreview(livePoint) {
       circle.setAttribute('cx', point[0]);
       circle.setAttribute('cy', point[1]);
       circle.setAttribute('r', 5 * scale);
-      circle.setAttribute('fill', '#0D9488');
+      circle.setAttribute('fill', '#15803D');
       circle.style.pointerEvents = 'none';
       lineOverlay.appendChild(circle);
     });
@@ -1115,6 +1243,7 @@ finishBaselineBtn.addEventListener('click', () => {
         segmentationLines.push({ polygon: data.polygon, baseline: data.baseline });
         exitDrawMode();
         autoSaveSegmentation();
+        document.getElementById('advance-to-ocr-btn').disabled = segmentationLines.length === 0;   // 👈 add this line
       } else {
         alert(data.error || 'Could not generate a polygon for this baseline.');
       }
@@ -1124,6 +1253,8 @@ finishBaselineBtn.addEventListener('click', () => {
     });
 });
 }
+
+
 
 
 let segmentationHistory = [];
@@ -1242,5 +1373,24 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
       document.getElementById('processing-overlay').style.display = 'none';
     });
 });
+
+
+
+function deselectIfEmpty(e) {
+  if (didDrag) return;
+  if (isDrawingBaseline) return;
+  if (selectedIndices.size === 0) return;
+  selectedIndices = new Set();
+  if (paddingTop) {
+    paddingTop.value = 0;
+    paddingBottom.value = 0;
+    paddingLeft.value = 0;
+    paddingRight.value = 0;
+  }
+  renderOverlay();
+}
+
+previewImage.addEventListener('click', deselectIfEmpty);
+document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
 
 

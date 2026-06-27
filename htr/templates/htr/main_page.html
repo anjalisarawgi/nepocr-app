@@ -79,6 +79,18 @@
         </div>
         <div class="preview-bar" id="preview-bar" style="display: {% if selected_doc %}flex{% else %}none{% endif %};">
           <span id="preview-filename">{% if selected_doc %}{{ selected_doc.filename }}{% endif %}</span>
+
+
+          {% if selected_doc %}
+          <span id="preview-last-updated" class="preview-last-updated">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            {{ selected_doc.updated_at|timesince }} ago
+          </span>
+          {% endif %}
+          
           <!-- <span id="segmentation-save-status" class="save-status"></span>  -->
 
           <button id="delete-line-btn" class="btn-delete-line" style="display:none;">
@@ -90,6 +102,7 @@
             </svg>
             Delete line
           </button>
+          
 
           <div class="overlay-toggle-group" id="overlay-toggle-group" style="display:none;">
             <label class="overlay-toggle">
@@ -102,7 +115,7 @@
             </label>
           </div>
 
-
+          
 
           {% if selected_doc.status == 'segmented' %}
           <button id="draw-baseline-btn" class="btn-draw-baseline" title="Draw new baseline">
@@ -163,6 +176,7 @@
           </div>
         </div>
         <svg id="line-overlay" style="position:absolute; top:38px; left:0; width:100%; height:calc(100% - 38px); display:none; pointer-events:none;"></svg>
+        <div id="selection-box" class="selection-box" style="display:none;"></div>
 
         <div id="readonly-toast" class="readonly-toast" style="display:none;">
           This is not editable here. Go back to Step 2: Line Segmentation to edit.
@@ -203,7 +217,7 @@
     </section>
 
 
-
+    <div class="resize-handle" id="resize-handle-right"></div>
     <!-- Right column: accordion + export -->
     <section class="right-col">
 
@@ -268,7 +282,7 @@
                 
                     <div class="slider-row" id="k-slider-row" style="display: {% if selected_doc.preprocessing_settings.sauvola %}flex{% else %}none{% endif %};">
                       <span class="slider-label">k</span>
-                      <input type="range" id="k-slider" min="0" max="100" step="1" value="{{ selected_doc.preprocessing_settings.k_slider_value|default:20 }}">
+                      <input type="range" id="k-slider" min="0" max="300 step="1" value="{{ selected_doc.preprocessing_settings.k_slider_value|default:20 }}">
                       <span class="slider-value" id="k-value">{{ selected_doc.preprocessing_settings.k|default:0.2 }}</span>
                     </div>
                   </span>
@@ -343,6 +357,26 @@
 
 
                 <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+
+                <div class="padding-controls" id="padding-controls" style="display:none;">
+                  <p class="placeholder-text" style="margin-bottom:4px;">Select a line, then adjust its padding:</p>
+                  <div class="padding-row">
+                    <span class="padding-label">Top</span>
+                    <input type="range" id="padding-top" min="-300" max="300" value="0">
+                  </div>
+                  <div class="padding-row">
+                    <span class="padding-label">Bottom</span>
+                    <input type="range" id="padding-bottom" min="-300" max="300" value="0">
+                  </div>
+                  <div class="padding-row">
+                    <span class="padding-label">Left</span>
+                    <input type="range" id="padding-left" min="-300" max="300" value="0">
+                  </div>
+                  <div class="padding-row">
+                    <span class="padding-label">Right</span>
+                    <input type="range" id="padding-right" min="-300" max="300" value="0">
+                  </div>
+                </div>
 
 
                 <div class="step-nav-row">
@@ -434,7 +468,7 @@
                     ← Previous Step
                   </button>
                 </div>
-
+    
 
               </div>
             </div>
