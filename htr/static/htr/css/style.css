@@ -1122,18 +1122,19 @@ nav {
   position: relative;
   background: var(--canvas-bg);
   border-radius: 14px;
-  padding: 24px 28px 28px;
-  max-width: 640px;
-  width: 90%;
-  max-height: 80vh;
+  padding: 18px 20px 20px;       /* was 24px 28px 28px */
+  max-width: 820px;              /* was 640px */
+  width: 92%;                    /* was 90% */
+  max-height: 85vh;              /* was 80vh */
   overflow-y: auto;
   box-shadow: 0 12px 40px rgba(0,0,0,0.4);
 }
 
+
 .line-popup-card img {
   display: block;
   width: 100%;
-  max-height: 320px;
+  max-height: 480px;              /* was 320px */
   object-fit: contain;
   background: #fff;
   border-radius: 8px;
@@ -1143,19 +1144,19 @@ nav {
 .line-popup-divider {
   height: 1px;
   background: rgba(255,255,255,0.12);
-  margin: 18px 0;
+  margin: 12px 0;                /* was 18px 0 */
 }
 
 .line-popup-text {
   font-family: var(--serif);
   font-weight: 500;
   color: #F5F0EA;
-  line-height: 1.7;
+  line-height: 1.6;               /* was 1.7 */
   letter-spacing: 0.01em;
   text-align: center;
   white-space: normal;
   word-break: break-word;
-  padding: 4px 6px;
+  padding: 2px 4px;               /* was 4px 6px */
 }
 
 .line-popup-close {
@@ -1181,3 +1182,7 @@ nav {
   cursor: pointer;
 }
 
+.ocr-line-result.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}

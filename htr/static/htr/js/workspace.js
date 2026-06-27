@@ -811,9 +811,10 @@ function renderOverlay() {
       const isHovered = index === hoveredLineIndex;
       const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygon.setAttribute('points', points);
-      polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (selectedIndices.has(index) ? 'rgba(30,90,200,0.15)' : 'rgba(30,90,200,0.22)'));
-      polygon.setAttribute('stroke', isHovered ? 'none' : '#1E3A5F');
-      polygon.setAttribute('stroke-width', (isHovered ? 0 : (selectedIndices.has(index) ? 1.5 : 0)) * scale);
+      const isSelected = selectedIndices.has(index);
+      polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (isSelected ? 'rgba(168,81,46,0.30)' : 'rgba(30,90,200,0.22)'));
+      polygon.setAttribute('stroke', isHovered ? 'none' : (isSelected ? '#A8512E' : '#1E3A5F'));
+      polygon.setAttribute('stroke-width', (isHovered ? 0 : (isSelected ? 2.5 : 0)) * scale);
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = isReadOnlyOverlay ? 'not-allowed' : 'pointer';
       if (!isReadOnlyOverlay) {
@@ -842,7 +843,7 @@ function renderOverlay() {
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
           if (didDrag) return;
-          showReadOnlyToast();
+          selectOcrResultForLine(index);
         });
       }
       svg.appendChild(polygon);
@@ -955,6 +956,21 @@ document.getElementById('show-baselines-checkbox').addEventListener('change', (e
 });
 
 //
+function selectOcrResultForLine(lineIndex) {
+  const resultsDiv = document.getElementById('ocr-results');
+  if (!resultsDiv) return;
+
+  const row = resultsDiv.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
+  if (!row) return;
+
+  resultsDiv.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
+  row.classList.add('selected');
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  selectedIndices = new Set([lineIndex]);
+  renderOverlay();
+}
+
 function setupOcrHoverHighlight() {
   const resultsDiv = document.getElementById('ocr-results');
   if (!resultsDiv) return;
@@ -1386,11 +1402,42 @@ function deselectIfEmpty(e) {
     paddingLeft.value = 0;
     paddingRight.value = 0;
   }
+  document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
   renderOverlay();
 }
 
 previewImage.addEventListener('click', deselectIfEmpty);
 document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
+
+
+function fitTextToImageWidth(text, whiteLeftFrac = 0, whiteWidthFrac = 1) {
+  const popupImg = document.getElementById('line-popup-img');
+  const textEl = document.getElementById('line-popup-text');
+
+  const imageWidth = popupImg.clientWidth || popupImg.naturalWidth;
+  const targetWidth = imageWidth * whiteWidthFrac;
+  const leftOffset = imageWidth * whiteLeftFrac;
+
+  // Measure the text's actual rendered width at a baseline font size,
+  // then scale it so the line exactly spans the white region.
+  const baseFontSize = 24;
+  textEl.style.whiteSpace = 'nowrap';
+  textEl.style.display = 'inline-block';
+  textEl.style.width = 'auto';
+  textEl.style.fontSize = baseFontSize + 'px';
+
+  const measuredWidth = textEl.scrollWidth || 1;
+  let fontSize = (targetWidth / measuredWidth) * baseFontSize;
+  fontSize = Math.min(Math.max(fontSize, 14), 64);
+
+  textEl.style.fontSize = fontSize + 'px';
+  textEl.style.whiteSpace = 'normal';
+  textEl.style.display = 'block';
+  textEl.style.width = targetWidth + 'px';
+  textEl.style.marginLeft = leftOffset + 'px';
+  textEl.style.marginRight = 'auto';
+}
+
 
 let currentPopupText = '';
 let currentPopupHtml = '';
@@ -1406,13 +1453,14 @@ function openLinePreviewPopup(lineIndex, predText, predHtml) {
   const minY = Math.min(...ys), maxY = Math.max(...ys);
 
   // Wider padding than before, so there's visible context around the polygon.
-  const padX = (maxX - minX) * 0.25 + 10;
-  const padY = (maxY - minY) * 0.6 + 10;
+  const padX = (maxX - minX) * 0.08 + 8;
+  const padY = (maxY - minY) * 0.18 + 8;
   const cropX = Math.max(0, minX - padX);
   const cropY = Math.max(0, minY - padY);
   const cropW = Math.min(previewImage.naturalWidth - cropX, (maxX - minX) + padX * 2);
   const cropH = Math.min(previewImage.naturalHeight - cropY, (maxY - minY) + padY * 2);
-
+  const whiteLeftFrac = (minX - cropX) / cropW;
+  const whiteWidthFrac = (maxX - minX) / cropW;
   const canvas = document.createElement('canvas');
   canvas.width = cropW;
   canvas.height = cropH;
@@ -1458,7 +1506,8 @@ function openLinePreviewPopup(lineIndex, predText, predHtml) {
     confidenceCheckbox.checked ? predHtml : predText;
   
   // Wait a tick for the image to lay out before measuring its width.
-  requestAnimationFrame(() => fitTextToImageWidth(predText));
+  requestAnimationFrame(() => fitTextToImageWidth(predText, whiteLeftFrac, whiteWidthFrac));
+
   
   document.getElementById('line-popup-backdrop').style.display = 'flex';
 }
@@ -1476,7 +1525,6 @@ function setupOcrClickPopup() {
     openLinePreviewPopup(idx, textSpan.dataset.plain, textSpan.dataset.html);
   });
 }
-setupOcrClickPopup();
 
 document.getElementById('line-popup-backdrop').addEventListener('click', (e) => {
   if (e.target.id === 'line-popup-backdrop' || e.target.id === 'line-popup-close') {
@@ -1489,19 +1537,3 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('line-popup-backdrop').style.display = 'none';
   }
 });
-
-function fitTextToImageWidth(text) {
-  const popupImg = document.getElementById('line-popup-img');
-  const textEl = document.getElementById('line-popup-text');
-
-  const charCount = Math.max(text.replace(/\s/g, '').length, 1);
-  const availableWidth = (popupImg.clientWidth || popupImg.naturalWidth) * 0.92; // leave a little margin
-
-  const avgGlyphWidthFactor = 0.75;
-  let fontSize = availableWidth / (charCount * avgGlyphWidthFactor);
-  fontSize = Math.min(Math.max(fontSize, 18), 40); // tighter ceiling than before
-
-  textEl.style.fontSize = fontSize + 'px';
-}
-
-
