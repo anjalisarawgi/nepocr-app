@@ -149,6 +149,7 @@ let cropInteractionMode = null;
 let cropDragStart = null;
 
 cropOverlay.addEventListener('mousedown', (e) => {
+  e.stopPropagation();
   if (e.target.classList.contains('crop-handle') || e.target === cropBox) return;
 
   imageBounds = getVisibleImageRect();
@@ -192,8 +193,8 @@ cropOverlay.addEventListener('mouseup', () => {
 
 // Move the whole box
 cropBox.addEventListener('mousedown', (e) => {
-  if (e.target.classList.contains('crop-handle')) return;
   e.stopPropagation();
+  if (e.target.classList.contains('crop-handle')) return;
   imageBounds = getVisibleImageRect();
   cropInteractionMode = 'moving';
   cropDragStart = {
