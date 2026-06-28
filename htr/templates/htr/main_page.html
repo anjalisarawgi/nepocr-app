@@ -110,7 +110,7 @@
               <span>Polygons</span>
             </label>
             <label class="overlay-toggle">
-              <input type="checkbox" id="show-baselines-checkbox" checked>
+              <input type="checkbox" id="show-baselines-checkbox" {% if selected_doc.status != 'ocr_done' %}checked{% endif %}>
               <span>Baselines</span>
             </label>
           </div>

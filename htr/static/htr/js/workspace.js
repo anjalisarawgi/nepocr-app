@@ -765,7 +765,7 @@ let isAdjustingPadding = false;
 
 let overlayPageWidth, overlayPageHeight;
 let showPolygons = true;
-let showBaselines = true;
+let showBaselines = docStatus !== 'ocr_done';
 const isReadOnlyOverlay = docStatus === 'ocr_done';
 
 
