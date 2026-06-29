@@ -310,24 +310,7 @@
                     </div>
                   </span>
                 </label>
-                
-                <label class="option-card {% if selected_doc.preprocessing_settings.opening %}checked{% endif %}" id="opening-card">
-                  <input type="checkbox" id="opening-checkbox" {% if selected_doc.preprocessing_settings.opening %}checked{% endif %}>
-                  <span class="checkbox-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  </span>
-                  <span class="option-text">
-                    <span class="option-title">Morphological opening</span>
-                    <span class="option-desc">Removes small specks of noise without distorting strokes.</span>
-                
-                    <div class="slider-row" id="opening-slider-row" style="display: {% if selected_doc.preprocessing_settings.opening %}flex{% else %}none{% endif %};">
-                      <span class="slider-label">Kernel size</span>
-                      <input type="range" id="opening-slider" min="1" max="15" step="2" value="{{ selected_doc.preprocessing_settings.opening_size|default:3 }}">
-                      <span class="slider-value" id="opening-value">{{ selected_doc.preprocessing_settings.opening_size|default:3 }}</span>
-                    </div>
-                  </span>
-                </label>
-
+              
                 <button class="btn-primary" type="button" id="run-segmentation-btn">Next Step →</button>
                 
               </div>

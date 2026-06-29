@@ -535,10 +535,10 @@ const tileValue = document.getElementById('tile-value');
 const clipRow = document.getElementById('clip-slider-row');
 const tileRow = document.getElementById('tile-slider-row');
 
-const openingCheckbox = document.getElementById('opening-checkbox');
-const openingSlider = document.getElementById('opening-slider');
-const openingValue = document.getElementById('opening-value');
-const openingRow = document.getElementById('opening-slider-row');
+// const openingCheckbox = document.getElementById('opening-checkbox');
+// const openingSlider = document.getElementById('opening-slider');
+// const openingValue = document.getElementById('opening-value');
+// const openingRow = document.getElementById('opening-slider-row');
 
 function runPreprocessing() {
   document.getElementById('processing-overlay').style.display = 'flex';
@@ -547,7 +547,7 @@ function runPreprocessing() {
   formData.append('gaussian', gaussianCheckbox.checked ? 'true' : 'false');
   formData.append('clahe', clahecheckbox.checked ? 'true' : 'false');
   formData.append('sauvola', sauvolaCheckbox.checked ? 'true' : 'false');
-  formData.append('opening', openingCheckbox.checked ? 'true' : 'false');
+  // formData.append('opening', openingCheckbox.checked ? 'true' : 'false');
 
   formData.append('kernel_size', kernelSlider.value);
   formData.append('sigma', sigmaSlider.value);
@@ -555,7 +555,7 @@ function runPreprocessing() {
   formData.append('tile_size', tileSlider.value);
   formData.append('window_size', windowSlider.value);
   formData.append('k', kSlider.value / 100);
-  formData.append('opening_size', openingSlider.value);
+  // formData.append('opening_size', openingSlider.value);
 
   fetch(`/preprocess/${currentDocId}/`, {
     method: 'POST',
@@ -603,11 +603,6 @@ clahecheckbox.addEventListener('change', () => {
   runPreprocessing();
 });
 
-openingCheckbox.addEventListener('change', () => {
-  openingCheckbox.closest('.option-card').classList.toggle('checked', openingCheckbox.checked);
-  openingRow.style.display = openingCheckbox.checked ? 'flex' : 'none';
-  runPreprocessing();
-});
 
 
 kernelSlider.addEventListener('input', () => { kernelValue.textContent = kernelSlider.value; debouncedRun(); });
@@ -616,7 +611,7 @@ windowSlider.addEventListener('input', () => { windowValue.textContent = windowS
 kSlider.addEventListener('input', () => { kValue.textContent = (kSlider.value / 100).toFixed(2); debouncedRun(); });
 clipSlider.addEventListener('input', () => { clipValue.textContent = (clipSlider.value / 10).toFixed(1); debouncedRun(); });
 tileSlider.addEventListener('input', () => { tileValue.textContent = tileSlider.value; debouncedRun(); });
-openingSlider.addEventListener('input', () => { openingValue.textContent = openingSlider.value; debouncedRun(); });
+// openingSlider.addEventListener('input', () => { openingValue.textContent = openingSlider.value; debouncedRun(); });
 
 
 

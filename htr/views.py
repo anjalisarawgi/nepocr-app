@@ -118,9 +118,9 @@ def apply_preprocessing(request, pk):
         gaussian_on = request.POST.get('gaussian') == 'true'
         clahe_on = request.POST.get('clahe') == 'true'
         sauvola_on = request.POST.get('sauvola') == 'true'
-        opening_on = request.POST.get('opening') == 'true'
+        # opening_on = request.POST.get('opening') == 'true'
 
-        if not any([gaussian_on, clahe_on, sauvola_on, opening_on]):
+        if not any([gaussian_on, clahe_on, sauvola_on]):
             image.processed.delete(save=True)
             image.preprocessing_settings = {}
             image.processed.delete(save=True)
@@ -132,7 +132,6 @@ def apply_preprocessing(request, pk):
         tile_size = int(request.POST.get('tile_size', 8))
         window_size = int(request.POST.get('window_size', 25))
         k = float(request.POST.get('k', 0.2))
-        opening_size = int(request.POST.get('opening_size', 3))
 
         if kernel_size % 2 == 0:
             kernel_size += 1
@@ -161,13 +160,6 @@ def apply_preprocessing(request, pk):
             binary = (gray > thresh).astype(np.uint8) * 255
             img = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
 
-        if opening_on:
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            inverted = cv2.bitwise_not(gray)
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (opening_size, opening_size))
-
-            opened = cv2.morphologyEx(inverted, cv2.MORPH_OPEN, kernel)
-            img = cv2.bitwise_not(opened)
 
         success, buffer = cv2.imencode('.jpg', img)
         content = ContentFile(buffer.tobytes())
@@ -177,14 +169,12 @@ def apply_preprocessing(request, pk):
             'gaussian': gaussian_on,
             'clahe': clahe_on,
             'sauvola': sauvola_on,
-            'opening': opening_on,
             'kernel_size': kernel_size,
             'sigma': sigma,
             'clip_limit': clip_limit,
             'tile_size': tile_size,
             'window_size': window_size,
             'k': k,
-            'opening_size': opening_size,
         }
         
         image.processed.save(image.filename, content, save=True)
