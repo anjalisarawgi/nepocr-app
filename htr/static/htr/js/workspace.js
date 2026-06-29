@@ -1591,7 +1591,9 @@ const STEP_INFO = {
 
       <div class="info-note">
       <strong>Note:</strong> Please note that the probabilities are just an indication of how confident a model was while predicting a specific character and does not indicate a correct / incorrect prediction. It can be both helpful and not helpful to find the errors.
-    </div>
+          <strong>Note:</strong> To add: dictionary / lexicon matching of the words.
+
+      </div>
 
     `
   },
