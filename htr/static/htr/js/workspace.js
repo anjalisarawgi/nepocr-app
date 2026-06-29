@@ -1533,3 +1533,104 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('line-popup-backdrop').style.display = 'none';
   }
 });
+
+
+const infoModalBackdrop = document.getElementById('info-modal-backdrop');
+const infoModalTitle = document.getElementById('info-modal-title');
+const infoModalBody = document.getElementById('info-modal-body');
+
+const STEP_INFO = {
+  '1': {
+    title: 'Some notes',
+    body: `
+        <ol class="info-steps">
+      <p> You can choose neither, one or more options as preferred.<p>
+      <li><strong>Gaussian normalization</strong>: This method is quite good in my experience and I would recommend it. It estimates the background texture, and then removes it from the image. It works very well for images which have dark shadows and the text is hard to read</li>
+
+      <li><strong>Sauvola binarization</strong>: This method is also good, but can be very harsh for the scripts. I think it works well too for dark shaded regions, but can spoil the faded text areas, and the model performance reduces. Be careful when using.</li>
+      <li><strong>CLAHE lighting correction</strong>: It is useful as a method when there is uneven ligting in the document. For example, if one half of the page is very light, and the other half is very dark. It balances the contrast (locally), and can help improve the text readability.</li>
+</ol>
+    <div class="info-note">
+      <strong>Note:</strong> The default ranges set are what worked the best when I tried generally, but you can change it as you like. Also a nice way to check it is by zooming in the image well, and seeing if the text pixels are smooth, or if it ends abruptly. If it is smooth, it is better for the model.
+    </div>
+      `
+  },
+  '2': {
+    title: 'Some notes',
+    body: `
+    <ol class="info-steps">
+      <li>Click  <strong>Run segmentation</strong> which will automatically detect individual text lines</li>
+      <li>Please note that it is very rare that the segmentations are perfect (we need to improve the model as we go)</li>
+      <li>Since there are errors, you can choose to edit it (like in eScriptorium)</li>
+      <li>There are three edits you can make:
+      <ol class="info-substeps">
+
+      <li> Click on the polygon (in the image) →you can delete it</li>
+
+      <li> Click on the polygon (in the image) →you can move around the coordinates to improve the predicted coordinates</li>
+      <li> If there is no polygon for a specific line, or you would like to redraw one →there is a small icon with a line and two dots in the preview bar → click on it → then click on the begining of the line you want to segment →  a green dot and line will appear → then click on the end of the line → then press ENTER to save → the polygon will appear </li>
+</ol>
+</li>
+      </ol>
+    <div class="info-note">
+      <strong>Note 1:</strong> There is also a box with top/down/left/right rows which is active when you click on a polygon. Since it can be tedious to drag each polygon coordinate one by one, this option lets you drag all coordinates in one side of the polygon (eg all coordinates at the top) together. It is just a faster way and can help sometimes. 
+      <strong>Note 2:</strong> You can press control + A to select all polygons and delete. 
+
+    </div>
+    `
+  },
+  '3': {
+    title: 'Some notes',
+    body: `
+        <ol class="info-steps">
+      <li>Please click on <strong>Run OCR</strong> to run the trained HTR/OCR model.</li>
+      <li> It will give the image transcriptions line by line. </li>
+      <li>You can also click on any polygon on the image to check the model's prediction for that specific polygon/line.</li>
+      <li> Along with, you should also see the model confidence predicted. </li>
+            </ol>
+
+      <div class="info-note">
+      <strong>Note:</strong> Please note that the probabilities are just an indication of how confident a model was while predicting a specific character and does not indicate a correct / incorrect prediction. It can be both helpful and not helpful to find the errors.
+    </div>
+
+    `
+  },
+'crop': {
+  title: 'Some notes',
+  body: `
+    <ol class="info-steps">
+      <li>If you like, you can crop the document using the cropping icon tool.</li>
+      <li>Once cropped, click the green tickmark to save, or the red X to discard.</li>
+      <li>You can also continue without cropping.</li>
+      <li>Click <strong>Next</strong> to continue.</li>
+    </ol>
+    <div class="info-note">
+      <strong>Note:</strong> the segmentation model usually works better when the page boundaries are still visible, so try not to crop aggressively.
+    </div>
+  `
+},
+};
+
+document.querySelectorAll('.info-btn').forEach((btn) => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't toggle the accordion section
+    const step = btn.dataset.infoStep;
+    const info = STEP_INFO[step];
+    if (!info) return;
+    infoModalTitle.textContent = info.title;
+    infoModalBody.innerHTML = info.body;
+    infoModalBackdrop.style.display = 'flex';
+  });
+});
+
+infoModalBackdrop.addEventListener('click', (e) => {
+  if (e.target.id === 'info-modal-backdrop' || e.target.id === 'info-modal-close') {
+    infoModalBackdrop.style.display = 'none';
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    infoModalBackdrop.style.display = 'none';
+  }
+});

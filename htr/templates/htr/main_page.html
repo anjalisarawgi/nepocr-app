@@ -156,6 +156,15 @@
             <button class="ba-btn" id="before-btn" data-mode="before">Before</button>
             <button class="ba-btn active" id="after-btn" data-mode="after">After</button>
           </div>
+
+          <button id="preview-info-btn" class="info-btn" type="button" data-info-step="crop" title="About cropping"
+            style="display: {% if selected_doc.status == 'uploaded' %}flex{% else %}none{% endif %};">     
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25c-.66.32-1.1.95-1.1 1.65v.4"/>
+              <line x1="12" y1="17" x2="12" y2="17.01"/>
+            </svg>
+          </button>
         
           <button id="next-step-btn" class="btn-next-bar" {% if selected_doc.status != 'uploaded' %}disabled{% endif %}>
             Next:
@@ -228,6 +237,14 @@
 
           <div class="accordion-header">
             <span class="accordion-title">Step 1: Image Cleaning</span>
+          
+            <button type="button" class="info-btn" data-info-step="1" title="What do these options do?">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25c-.66.32-1.1.95-1.1 1.65v.4"/>
+                <line x1="12" y1="17" x2="12" y2="17.01"/>
+              </svg>
+            </button>
             {% if selected_doc.status != 'uploaded' %}
               <span class="step-done-badge">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -248,7 +265,7 @@
                   </span>
                   <span class="option-text">
                     <span class="option-title">Gaussian normalization</span>
-                    <span class="option-desc">It tries to clean the background texture of the image so that the noise can be cleaned.</span>
+                    <span class="option-desc">It tries to clean the background texture / noise of the image so that the text becomes more readable.</span>
                 
                     <div class="slider-row" id="kernel-slider-row" style="display: {% if selected_doc.preprocessing_settings.gaussian %}flex{% else %}none{% endif %};">
                       <span class="slider-label">Kernel size</span>
@@ -295,7 +312,7 @@
                   </span>
                   <span class="option-text">
                     <span class="option-title">CLAHE lighting correction</span>
-                    <span class="option-desc">Boosts local contrast to reveal faint ink in shadowed areas.</span>
+                    <span class="option-desc">Fixes uneven image ligting but modifying local contrast.</span>
                 
                     <div class="slider-row" id="clip-slider-row" style="display: {% if selected_doc.preprocessing_settings.clahe %}flex{% else %}none{% endif %};">
                       <span class="slider-label">Clip limit</span>
@@ -322,6 +339,13 @@
 
           <div class="accordion-header">
             <span class="accordion-title">Step 2: Line Segmentation</span>
+            <button type="button" class="info-btn" data-info-step="2" title="What does this step do?">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25c-.66.32-1.1.95-1.1 1.65v.4"/>
+                <line x1="12" y1="17" x2="12" y2="17.01"/>
+              </svg>
+            </button>
             {% if selected_doc.status == 'ocr_done' %}
               <span class="step-done-badge">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -391,12 +415,22 @@
 
           <div class="accordion-header">
             <span class="accordion-title">Step 3: Run OCR</span>
+
+            <button type="button" class="info-btn" data-info-step="3" title="What does this step do?">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.5 9a2.5 2.5 0 1 1 3.6 2.25c-.66.32-1.1.95-1.1 1.65v.4"/>
+                <line x1="12" y1="17" x2="12" y2="17.01"/>
+              </svg>
+            </button>
+
             <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
+          
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. We also report the model confidence along with the ocr predictions.</p>
+                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. Please go back to the previous step to modify segmentations and run the model again.</p>
               
                 <div class="ocr-action-zone">
                   <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
@@ -476,6 +510,16 @@
       <div id="line-popup-text" class="line-popup-text"></div>
     </div>
   </div>
+
+<div id="info-modal-backdrop" class="info-modal-backdrop" style="display:none;">
+  <div class="info-modal-card">
+    <button id="info-modal-close" class="info-modal-close" type="button">&times;</button>
+    <h3 class="info-modal-title" id="info-modal-title"></h3>
+    <div class="info-modal-body" id="info-modal-body"></div>
+  </div>
+</div>
+
+
   
   <script>
     let currentDocId = {% if selected_doc %}{{ selected_doc.id }}{% else %}null{% endif %};
