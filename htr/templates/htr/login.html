@@ -44,7 +44,6 @@
     <div class="app">
       <div class="app-name">nepOCR</div>
       <div class="app-tag">Old Nepali manuscript HTR</div>
-     <div class="app-tag">Please enter Username: admin , Password: admin</div>
     </div>
     <form method="post">
       {% csrf_token %}
@@ -66,6 +65,7 @@
         {{ form.password.errors }}
       </div>
       <button type="submit" class="login-btn">Sign in</button>
+      <div class="app-tag">Please enter Username: admin , Password: admin</div>
     </form>
   </div>
 </body>
