@@ -9,7 +9,31 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 import os
 from django.shortcuts import get_object_or_404
+from django.http import JsonResponse
+from skimage.filters import threshold_sauvola
+from kraken import blla
+from kraken.lib import vgsl
+from PIL import Image
+import json
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+import io
+from functools import lru_cache
+import torch
+from transformers import VisionEncoderDecoderModel, PreTrainedTokenizerFast, TrOCRProcessor
+import joblib
+import torch
+import re
+import pandas as pd
+import numpy as np
+from kraken.lib import segmentation as kraken_segmentation
+import json
+from PIL import ImageDraw
 
+
+KRAKEN_MODEL_PATH =  '/Users/anjalisarawgi/anaconda3/envs/gnn_hre/lib/python3.8/site-packages/kraken/blla.mlmodel'
+NUM_BEAMS = 1
+MAX_LEN =128
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -32,7 +56,6 @@ def logout_view(request):
 
 
 
-
 @login_required
 def upload_image(request, pk = None):
     if request.method == 'POST':
@@ -43,16 +66,16 @@ def upload_image(request, pk = None):
             instance.save()
             return redirect('view_image', pk=instance.pk)  
     else:
-        form = ImageUploadForm()
+        form = ImageUploadForm() # GET: someone just visited the page -- show empty form 
 
+    ## show the old files::
     documents = UploadedImage.objects.filter(user = request.user).order_by('-uploaded_at')
 
-    # for the image / id url
+    # for the selected image
     selected_doc = None
     if pk:
-        selected_doc = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        selected_doc = get_object_or_404(UploadedImage, pk=pk, user=request.user) # get_object_or_404 = go to the database, find the document with that id, belonging to this user, if it does not exist, show a 404 error page
 
-    
     return render(request, 'htr/main_page.html', {'form': form, 'documents': documents, 'selected_doc': selected_doc}) # page 1  = upload page  # 
 
 
@@ -65,7 +88,6 @@ def delete_image(request, pk):
     return redirect('main_page')
 
 
-from django.http import JsonResponse
 
 @login_required
 def crop_image(request, pk):
@@ -108,7 +130,6 @@ def advance_to_preprocessing(request, pk):
 
 
 
-from skimage.filters import threshold_sauvola
 
 @login_required
 def apply_preprocessing(request, pk):
@@ -197,12 +218,8 @@ def advance_to_segmentation(request, pk):
 
 
 
-from kraken import blla
-from kraken.lib import vgsl
-from PIL import Image
-import io
 
-KRAKEN_MODEL_PATH =  '/Users/anjalisarawgi/anaconda3/envs/gnn_hre/lib/python3.8/site-packages/kraken/blla.mlmodel'
+
 
 @login_required
 def run_segmentation(request, pk):
@@ -240,7 +257,6 @@ def run_segmentation(request, pk):
 
 
 
-import json
 
 @login_required
 def save_segmentation(request, pk):
@@ -255,8 +271,7 @@ def save_segmentation(request, pk):
     return JsonResponse({'success': False})
 
 
-from django.http import HttpResponse
-from django.template.loader import render_to_string
+
 
 @login_required
 def export_alto_xml(request, pk):
@@ -279,8 +294,7 @@ def export_alto_xml(request, pk):
 
 
 
-from kraken.lib import segmentation as kraken_segmentation
-import json
+
 
 @login_required
 def add_baseline_polygon(request, pk):
@@ -348,10 +362,6 @@ def back_to_segmentation(request, pk):
 
 
 ### OCR
-from functools import lru_cache
-import torch
-from transformers import VisionEncoderDecoderModel, PreTrainedTokenizerFast, TrOCRProcessor
-
 @lru_cache(maxsize=1)
 def load_ocr_model():
     model_path = "AnjaliSarawgi/model-fullset-57k"
@@ -369,8 +379,6 @@ def clean_ocr_text(text):
     return re.sub(r"[\u00AD\u200B\u200C\u200D]", "", text)
 
 
-import pandas as pd
-import numpy as np
 
 def predict_line_with_confidence(pil_crop, topk=3):
     model, tokenizer, processor, device = load_ocr_model()
@@ -379,8 +387,8 @@ def predict_line_with_confidence(pil_crop, topk=3):
     with torch.inference_mode():
         out = model.generate(
             pixel_values,
-            max_length=128,
-            num_beams=1,
+            max_length=MAX_LEN,
+            num_beams=NUM_BEAMS,
             do_sample=False,
             return_dict_in_generate=True,
             output_scores=True,
@@ -399,34 +407,28 @@ def predict_line_with_confidence(pil_crop, topk=3):
         tgt_id = int(tgt.item())
         conf = float(probs[tgt_id].item())
 
-        p = np.clip(conf, 1e-6, 1 - 1e-6)
-        cal_conf = beta.predict_proba([[np.log(p), np.log(1 - p)]])[0, 1]
+        # p = np.clip(conf, 1e-6, 1 - 1e-6)
+        # cal_conf = beta.predict_proba([[np.log(p), np.log(1 - p)]])[0, 1]
 
-        tk_vals, tk_idx = torch.topk(probs, k=min(topk, probs.shape[0]))
+        tk_vals, tk_idx = torch.topk(probs, k=min(3, probs.shape[0]))
         tk_idx = tk_idx.tolist()
         tk_vals = tk_vals.tolist()
-        if tgt_id in tk_idx:
-            j = tk_idx.index(tgt_id)
-            tk_idx.pop(j)
-            tk_vals.pop(j)
 
-        alt_ids = [tgt_id] + tk_idx[: topk - 1]
-        alt_ps = [conf] + tk_vals[: topk - 1]
-        alt_tokens = [tokenizer.decode([i], skip_special_tokens=True) for i in alt_ids]
+        alt_tokens = [tokenizer.decode([i], skip_special_tokens=True) for i in tk_idx]
+        alt_probs  = tk_vals
 
         rows.append({
-            "token": alt_tokens[0],
-            "confidence": conf,
-            "cal_confidence": float(cal_conf),
+            "token":      alt_tokens[0],
+            "confidence": alt_probs[0],
             "alt_tokens": "|".join(alt_tokens),
-            "alt_probs": "|".join([f"{p:.6f}" for p in alt_ps]),
+            "alt_probs":  "|".join([f"{p:.6f}" for p in alt_probs]),
         })
 
     df_tok = pd.DataFrame(rows)
     highlighted_html = highlight_tokens_with_tooltips(decoded_text, df_tok)
     return decoded_text, highlighted_html
 
-from PIL import ImageDraw
+
 
 @login_required
 def run_ocr(request, pk):
@@ -510,9 +512,7 @@ def run_ocr(request, pk):
 
 
 
-import joblib
-import torch
-import re
+
 
 @lru_cache(maxsize=1)
 def load_beta_calibrator():
@@ -520,37 +520,6 @@ def load_beta_calibrator():
     path = os.path.join(base_dir, 'beta_calibrator.joblib')
     return joblib.load(path)
 
-
-DEV_CONS = "\u0915-\u0939\u0958-\u095F\u0978-\u097F"
-INDEP_VOW = "\u0904-\u0914"
-NUKTA = "\u093C"
-VIRAMA = "\u094D"
-MATRAS = "\u093A-\u094C"
-BINDUS = "\u0901\u0902\u0903"
-AKSHARA_RE = re.compile(
-    rf"(?:"
-    rf"(?:[{DEV_CONS}]{NUKTA}?)(?:{VIRAMA}(?:[{DEV_CONS}]{NUKTA}?))*"
-    rf"(?:[{MATRAS}])?"
-    rf"(?:[{BINDUS}])?"
-    rf"|"
-    rf"(?:[{INDEP_VOW}](?:[{BINDUS}])?)"
-    rf")",
-    flags=re.UNICODE,
-)
-
-
-def split_aksharas(s):
-    spans = []
-    i = 0
-    while i < len(s):
-        m = AKSHARA_RE.match(s, i)
-        if m and m.end() > i:
-            spans.append((m.start(), m.end()))
-            i = m.end()
-        else:
-            spans.append((i, i + 1))
-            i += 1
-    return [s[a:b] for (a, b) in spans], spans
 
 
 def html_escape(s):
@@ -564,86 +533,41 @@ def html_escape(s):
 
 
 def highlight_tokens_with_tooltips(line_text, df_tok):
-    aks, spans = split_aksharas(line_text)
-    joined = "".join(aks)
-    used_ranges = []
-    insertions = []
-    search_cursor = 0
+    parts = []
 
     for _, row in df_tok.iterrows():
-        token = row.get("token", "").strip()
+        token = row.get("token", "")
         if not token:
             continue
-        start_char_idx = joined.find(token, search_cursor)
-        if start_char_idx == -1:
-            continue
-        search_cursor = start_char_idx + len(token)
 
-        ak_start = ak_end = None
-        cum_len = 0
-        for i, ak in enumerate(aks):
-            next_len = cum_len + len(ak)
-            if cum_len <= start_char_idx < next_len:
-                ak_start = i
-            if cum_len < start_char_idx + len(token) <= next_len:
-                ak_end = i + 1
-                break
-            cum_len = next_len
+        conf = row.get("confidence", 0.0)
 
-        if ak_start is None or ak_end is None:
-            continue
-        if any(r[0] < ak_end and ak_start < r[1] for r in used_ranges):
-            continue
-        used_ranges.append((ak_start, ak_end))
-
-        char_start = spans[ak_start][0]
-        char_end = spans[ak_end - 1][1]
+        if conf >= 0.80:
+            conf_cls = "conf-green"
+        elif conf >= 0.60:
+            conf_cls = "conf-yellow"
+        elif conf >= 0.40:
+            conf_cls = "conf-orange"
+        else:
+            conf_cls = "conf-red"
 
         alt_toks = row.get("alt_tokens", "").split("|")
         alt_probs = row.get("alt_probs", "").split("|")
-        token_str = html_escape(line_text[char_start:char_end])
 
-        tooltip_lines = [f"Character: {token_str}"]
-        cal = row.get("cal_confidence", None)
-        conf_pct = cal * 100 if cal is not None else None
-
-        if conf_pct is None:
-            conf_cls = "conf-unknown"
-        elif conf_pct <= 20:
-            conf_cls = "conf-red"
-        elif conf_pct <= 40:
-            conf_cls = "conf-orange"
-        elif conf_pct <= 60:
-            conf_cls = "conf-yellow"
-        else:
-            conf_cls = "conf-green"
-
-        if cal is not None:
-            tooltip_lines.append(f"Model probability: {cal:.2f}")
-        for t, p in zip(alt_toks, alt_probs):
+        tooltip_lines = []
+        for t, p_str in zip(alt_toks, alt_probs):
             try:
-                prob = float(p)
-            except Exception:
+                prob = float(p_str)
+            except ValueError:
                 prob = 0.0
-            tooltip_lines.append(f"{html_escape(t)}: {prob:.3f}")
+            tooltip_lines.append(f"{html_escape(t) or '∅'}: {prob:.3f}")
 
-        tooltip = "\n".join(tooltip_lines)
-        cls = f"ocr-token {conf_cls}"
-        html_token = f"<span class='{cls}' data-tooltip='{html_escape(tooltip)}'>{token_str}</span>"
-        insertions.append((char_start, char_end, html_token))
+        tooltip = html_escape("\n".join(tooltip_lines))
+        parts.append(
+            f"<span class='ocr-token {conf_cls}' data-tooltip='{tooltip}'>{html_escape(token)}</span>"
+        )
 
-    if not insertions:
-        return html_escape(line_text)
-
-    insertions.sort()
-    out_parts = []
-    last_idx = 0
-    for s, e, html_tok in insertions:
-        out_parts.append(html_escape(line_text[last_idx:s]))
-        out_parts.append(html_tok)
-        last_idx = e
-    out_parts.append(html_escape(line_text[last_idx:]))
-    return "".join(out_parts)
+    return "".join(parts)
 
 
 @login_required
@@ -657,3 +581,24 @@ def download_ocr_text(request, pk):
     response = HttpResponse(content, content_type='text/plain; charset=utf-8')
     response['Content-Disposition'] = f'attachment; filename="{image.filename}_predictions.txt"'
     return response
+
+
+@login_required
+def edit_ocr(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        data = json.loads(request.body)
+        updated = data.get('predictions', [])
+
+        predictions = image.ocr_predictions or []
+        updated_map = {p['line_index']: p['text'] for p in updated}
+
+        for pred in predictions:
+            if pred['line_index'] in updated_map:
+                pred['text'] = updated_map[pred['line_index']]
+                pred['html'] = pred['text']  # simple version — no confidence colours after edit
+
+        image.ocr_predictions = predictions
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})

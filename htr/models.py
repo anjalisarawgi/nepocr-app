@@ -31,6 +31,7 @@ class UploadedImage(models.Model):
     ocr_predictions = models.JSONField(default=list, blank=True)
     ocr_stale = models.BooleanField(default=False)
     
+    
 
 
 

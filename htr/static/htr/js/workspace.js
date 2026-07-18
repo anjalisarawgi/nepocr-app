@@ -1,6 +1,39 @@
+// upload button
+// click - file picker opens
+document.getElementById('upload-trigger').addEventListener('click', () => {
+  document.querySelector('#upload-form input[type="file"]').click();
+})
 
 
-// Exclusive accordion: opening one section closes the others.
+// continued: wait for the user to pick the file
+// finds upload-form in html 
+// submits the form to Django and Django saves the file (based on views)
+// note: when submitting - it goes to urls which calls the upload_image function and then goes to the url essentially by callin git
+document.querySelector('#upload-form input[type="file"]').addEventListener('change', () => {
+  document.getElementById('upload-form').submit();
+})
+
+/////////////////////////////////////////////////////////////////////////////
+
+
+let cropStart = null;
+
+const cropBtn = document.getElementById('crop-btn');
+const cropConfirmBtn = document.getElementById('crop-confirm-btn');
+const cropCancelBtn = document.getElementById('crop-cancel-btn');
+const cropOverlay = document.getElementById('crop-overlay');
+const cropBox = document.getElementById('crop-box');
+const previewImage = document.getElementById('preview-image');
+const handle = document.getElementById('resize-handle');
+const handleRight = document.getElementById('resize-handle-right');
+const workspace = document.querySelector('.workspace');
+const beforeAfterToggle = document.getElementById('before-after-toggle');
+const beforeBtn = document.getElementById('before-btn');
+const afterBtn = document.getElementById('after-btn');
+
+///////////////////////////// some design overall layout fixes ////////////////////////////////////////////////
+
+// when one step is open lets close the other step
 document.getElementById('accordion').addEventListener('click', (e) => {
   const header = e.target.closest('.accordion-header');
   if (!header) return;
@@ -12,46 +45,28 @@ document.getElementById('accordion').addEventListener('click', (e) => {
   if (willOpen) section.classList.add('open');
 });
 
-// Sub-tabs inside the OCR section (placeholder switching, no content yet).
-document.querySelectorAll('.subtabs').forEach((group) => {
-  group.querySelectorAll('.subtab').forEach((tab) => {
-    tab.addEventListener('click', (e) => {
-      e.stopPropagation();
-      group.querySelectorAll('.subtab').forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-    });
-  });
-});
-
-// Export chip toggles (placeholder).
-document.querySelectorAll('.export-chip').forEach((chip) => {
-  chip.addEventListener('click', () => chip.classList.toggle('checked'));
-});
 
 
-
-
-// Resizable sidebar
-
-const handle = document.getElementById('resize-handle');
-const handleRight = document.getElementById('resize-handle-right');
-const workspace = document.querySelector('.workspace');
+// Resizable sidebars
 let isDragging = false;
 let isDraggingRight = false;
-
 let currentSidebarWidth = 280;
 let currentRightWidth = 550;
 
+// when we press on the left handle 
 handle.addEventListener('mousedown', () => {
   isDragging = true;
   handle.classList.add('dragging');
 });
 
+// when we press on the right handle 
 handleRight.addEventListener('mousedown', () => {
   isDraggingRight = true;
   handleRight.classList.add('dragging');
 });
 
+
+// when the mouse is moving
 document.addEventListener('mousemove', (e) => {
   if (mouseDownPos) {
     const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
@@ -75,6 +90,8 @@ document.addEventListener('mousemove', (e) => {
   applyZoom();
 });
 
+
+// when the mouse is released - stop dragging -- then cursor goes back to normal (css off)
 document.addEventListener('mouseup', () => {
   isPanning = false;
   mouseDownPos = null;
@@ -90,10 +107,14 @@ document.addEventListener('mouseup', () => {
   }
 });
 
+
+///////////////////////////////////////// the keyboard shortcuts : ///////////////////////////////////////
 document.addEventListener('keydown', (e) => {
   const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
   if (isTyping) return;
 
+
+  // cntrol + a  = select all 
   if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
     if (segmentationLines.length > 0) {
       e.preventDefault();
@@ -101,27 +122,21 @@ document.addEventListener('keydown', (e) => {
       renderOverlay();
     }
   }
-
+  // cntrol + z == undo 
   if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
     e.preventDefault();
     document.getElementById('undo-segmentation-btn').click();
   }
-
+  // escape = desleelct
   if (e.key === 'Escape') {
     selectedIndices = new Set();
     renderOverlay();
   }
 });
-////// crop //
 
-let cropStart = null;
 
-const cropBtn = document.getElementById('crop-btn');
-const cropConfirmBtn = document.getElementById('crop-confirm-btn');
-const cropCancelBtn = document.getElementById('crop-cancel-btn');
-const cropOverlay = document.getElementById('crop-overlay');
-const cropBox = document.getElementById('crop-box');
-const previewImage = document.getElementById('preview-image');
+
+///////////////////////////////////////// cropping : ///////////////////////////////////////
 
 if (cropBtn) {
 
@@ -133,35 +148,36 @@ function endCropMode() {
   cropCancelBtn.style.display = 'none';
 }
 
+// when we click the crop button - show the transparent overlay - hide drop - show the green and red options
 cropBtn.addEventListener('click', () => {
-  cropOverlay.style.display = 'block';
-  cropBtn.style.display = 'none';
-  cropConfirmBtn.style.display = 'flex';
-  cropCancelBtn.style.display = 'flex';
+  cropOverlay.style.display = 'block'; // overlay
+  cropBtn.style.display = 'none'; // the hide crop buttn
+  cropConfirmBtn.style.display = 'flex'; // the green tick
+  cropCancelBtn.style.display = 'flex'; // the red x button
 });
 
-cropCancelBtn.addEventListener('click', endCropMode);
+cropCancelBtn.addEventListener('click', endCropMode); // cancel button which undos / hides eveyrthing and shows the crop button again
 
+// now: drawginthe crop box code  [ start drawing, recording the start position]
 let imageBounds = null;
-
-let cropBoxRect = null;
 let cropInteractionMode = null;
 let cropDragStart = null;
 
 cropOverlay.addEventListener('mousedown', (e) => {
   e.stopPropagation();
-  if (e.target.classList.contains('crop-handle') || e.target === cropBox) return;
+  if (e.target.classList.contains('crop-handle') || e.target === cropBox) return; // if user clicked on a corner handle or the box itself - stop here, dont start drawing a new box
 
-  imageBounds = getVisibleImageRect();
+  imageBounds = getVisibleImageRect(); // to find out where exactly the image is on screen
   const rect = cropOverlay.getBoundingClientRect();
-  const rawX = e.clientX - rect.left;
+  const rawX = e.clientX - rect.left// converingt he mouse position to relative to the overlay and not the whole screen
   const rawY = e.clientY - rect.top;
 
+  // clamp so that it doesnt go outside while drawing
   cropStart = {
     x: clamp(rawX, imageBounds.left, imageBounds.left + imageBounds.width),
     y: clamp(rawY, imageBounds.top, imageBounds.top + imageBounds.height),
   };
-  cropInteractionMode = 'drawing';
+  cropInteractionMode = 'drawing'; // entering drawing mode
   cropBox.style.left = cropStart.x + 'px';
   cropBox.style.top = cropStart.y + 'px';
   cropBox.style.width = '0px';
@@ -169,12 +185,16 @@ cropOverlay.addEventListener('mousedown', (e) => {
   cropBox.style.display = 'block';
 });
 
+
+
+// now the drawing block rules -- [ grow the box following the mouse]
 cropOverlay.addEventListener('mousemove', (e) => {
   if (cropInteractionMode !== 'drawing' || !cropStart || !imageBounds) return;
   const rect = cropOverlay.getBoundingClientRect();
   const rawX = e.clientX - rect.left;
   const rawY = e.clientY - rect.top;
 
+  // keep inside the image
   const x = clamp(rawX, imageBounds.left, imageBounds.left + imageBounds.width);
   const y = clamp(rawY, imageBounds.top, imageBounds.top + imageBounds.height);
 
@@ -184,14 +204,15 @@ cropOverlay.addEventListener('mousemove', (e) => {
   cropBox.style.height = Math.abs(y - cropStart.y) + 'px';
 });
 
+// when the user releases themouse, stop drawing, -- the box remains wheere it is 
 cropOverlay.addEventListener('mouseup', () => {
   if (cropInteractionMode === 'drawing') {
-    cropInteractionMode = null;
-    cropStart = null;
+    cropInteractionMode = null; // stop drawing mode
+    cropStart = null; 
   }
 });
 
-// Move the whole box
+// Move the whole crop box around
 cropBox.addEventListener('mousedown', (e) => {
   e.stopPropagation();
   if (e.target.classList.contains('crop-handle')) return;
@@ -205,7 +226,7 @@ cropBox.addEventListener('mousedown', (e) => {
   };
 });
 
-// Resize via corner handles
+// Resize via corner handles the crop box
 document.querySelectorAll('.crop-handle').forEach((handle) => {
   handle.addEventListener('mousedown', (e) => {
     e.stopPropagation();
@@ -223,6 +244,9 @@ document.querySelectorAll('.crop-handle').forEach((handle) => {
   });
 });
 
+
+
+// 
 document.addEventListener('mousemove', (e) => {
   if (cropInteractionMode === 'moving' && cropDragStart && imageBounds) {
     const dx = e.clientX - cropDragStart.mouseX;
@@ -316,32 +340,13 @@ function getCookie(name) {
 }
 
 cropConfirmBtn.addEventListener('click', () => {
-  const elementRect = previewImage.getBoundingClientRect();
   const overlayRect = cropOverlay.getBoundingClientRect();
-
-  // Figure out the REAL visible image area inside the <img> box,
-  // accounting for object-fit: contain letterboxing
-  const naturalAspect = previewImage.naturalWidth / previewImage.naturalHeight;
-  const elementAspect = elementRect.width / elementRect.height;
-
-  let renderedWidth, renderedHeight, offsetX, offsetY;
-
-  if (naturalAspect > elementAspect) {
-    // image is letterboxed top/bottom
-    renderedWidth = elementRect.width;
-    renderedHeight = elementRect.width / naturalAspect;
-    offsetX = 0;
-    offsetY = (elementRect.height - renderedHeight) / 2;
-  } else {
-    // image is letterboxed left/right
-    renderedHeight = elementRect.height;
-    renderedWidth = elementRect.height * naturalAspect;
-    offsetX = (elementRect.width - renderedWidth) / 2;
-    offsetY = 0;
-  }
-
-  const visibleImageLeft = elementRect.left + offsetX;
-  const visibleImageTop = elementRect.top + offsetY;
+  const bounds = getVisibleImageRect();
+  
+  const visibleImageLeft = bounds.left + overlayRect.left;
+  const visibleImageTop = bounds.top + overlayRect.top;
+  const renderedWidth = bounds.width;
+  const renderedHeight = bounds.height;
 
   const boxLeft = parseFloat(cropBox.style.left);
   const boxTop = parseFloat(cropBox.style.top);
@@ -398,75 +403,59 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 
 } // closes "if (cropBtn)"
 
-let zoomLevel = 1;
-let panX = 0;
-let panY = 0;
-let isPanning = false;
-let panStart = { x: 0, y: 0 };
-let mouseDownPos = null;
-let didDrag = false;
 
+// ///////////////////////////////////////////////////////  // ///////////////////////////////////////////////////////
+let zoomLevel = 1; // current zoom (1 = normal, 2 = double size)
+let panX = 0; // how far is image dragged vertically
+let panY = 0;// how far is image dragged horizontally
+let isPanning = false; // is the user currently dragging?
+let panStart = { x: 0, y: 0 }; 
+let mouseDownPos = null; // where was the mouse clicked 
+let didDrag = false;// did the user drag or just click? 
+
+
+// this is when we click on the image , line overlay , or preview card, three elemets all use the same start pan function
 function startPan(e) {
   mouseDownPos = { x: e.clientX, y: e.clientY };
   didDrag = false;
   isPanning = true;
-  panStart = { x: e.clientX - panX, y: e.clientY - panY };
-  previewImage.style.cursor = 'grabbing';
+  panStart = { x: e.clientX - panX, y: e.clientY - panY }; // moves the iamge but enables the image to still stay under the cursors
+  previewImage.style.cursor = 'grabbing'; // the grab hand cursor
 }
 
-
+// all three of these trigger the same pan function 
 previewImage.addEventListener('mousedown', startPan);
 document.getElementById('line-overlay').addEventListener('mousedown', startPan);
 document.getElementById('preview-card').addEventListener('mousedown', startPan);
 
 
-document.addEventListener('mousemove', (e) => {
-  if (!isPanning) return;
-  panX = e.clientX - panStart.x;
-  panY = e.clientY - panStart.y;
-  applyZoom();
-});
-
-document.addEventListener('mouseup', () => {
-  isPanning = false;
-  previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
-});
-
-
-
+// zoom buddonts
 document.getElementById('zoom-in-btn').addEventListener('click', () => {
-  zoomLevel = Math.min(zoomLevel + 0.25, 8);
+  zoomLevel = Math.min(zoomLevel + 0.25, 8); // adds 0.25 but never goes above 8x
   applyZoom();
 });
 
 document.getElementById('zoom-out-btn').addEventListener('click', () => {
-  zoomLevel = Math.max(zoomLevel - 0.25, 0.5);
+  zoomLevel = Math.max(zoomLevel - 0.25, 0.5);  // subs 0.25 but never goes above 0.5x
   applyZoom();
 });
 
 document.getElementById('zoom-reset-btn').addEventListener('click', () => {
-  zoomLevel = 1;
-  panX = 0;
+  zoomLevel = 1; // back to normal 
+  panX = 0; // reset position
   panY = 0;
   applyZoom();
 });
 
 
-// zoom 2 
-previewImage.addEventListener('dblclick', () => {
-  zoomLevel = Math.min(zoomLevel + 0.5, 3);
-  applyZoom();
-});
+// // added feature: double click also zooms
+// previewImage.addEventListener('dblclick', () => {
+//   zoomLevel = Math.min(zoomLevel + 0.5, 3);
+//   applyZoom();
+// });
 
-let pinchStartDistance = null;
-let pinchStartZoom = 1;
 
-function getTouchDistance(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
+// control + scroll also does = zoom in or zoom out 
 function handleWheel(e) {
   e.preventDefault();
 
@@ -478,6 +467,8 @@ function handleWheel(e) {
       panY = 0;
     }
     applyZoom();
+
+    // to scroll without control:
   } else if (zoomLevel > 1) {
     if (e.shiftKey && e.deltaX === 0) {
       panX -= e.deltaY;
@@ -489,10 +480,9 @@ function handleWheel(e) {
   }
 }
 
-// previewImage.addEventListener('wheel', handleWheel, { passive: false });
 document.getElementById('preview-card').addEventListener('wheel', handleWheel, { passive: false });
 
-// 
+///////////////////////////////// next step button in preview bar /////////////////////////////////
 document.getElementById('next-step-btn').addEventListener('click', () => {
   fetch(`/advance/${currentDocId}/`, {
     method: 'POST',
@@ -506,10 +496,24 @@ document.getElementById('next-step-btn').addEventListener('click', () => {
     });
 });
 
+///////////////////////////////// before after toggle /////////////////////////////////
+let beforeUrl = lockedImageUrl;
+let afterUrl = processedImageUrl;
+if (afterUrl) {
+  beforeAfterToggle.style.display = 'flex';
+}
+
+function setMode(mode) {
+  beforeBtn.classList.toggle('active', mode === 'before');
+  afterBtn.classList.toggle('active', mode === 'after');
+  previewImage.src = mode === 'before' ? beforeUrl : afterUrl;
+}
+beforeBtn.addEventListener('click', () => setMode('before'));
+afterBtn.addEventListener('click', () => setMode('after'));
 
 
-// // gaussian
-//
+
+///////////////////////////////// DATA PREPROCESSING: /////////////////////////////////
 const gaussianCheckbox = document.getElementById('gaussian-checkbox');
 const sauvolaCheckbox = document.getElementById('sauvola-checkbox');
 
@@ -535,15 +539,10 @@ const tileValue = document.getElementById('tile-value');
 const clipRow = document.getElementById('clip-slider-row');
 const tileRow = document.getElementById('tile-slider-row');
 
-// const openingCheckbox = document.getElementById('opening-checkbox');
-// const openingSlider = document.getElementById('opening-slider');
-// const openingValue = document.getElementById('opening-value');
-// const openingRow = document.getElementById('opening-slider-row');
-
 function runPreprocessing() {
-  document.getElementById('processing-overlay').style.display = 'flex';
+  document.getElementById('processing-overlay').style.display = 'flex'; // show the sponner 
 
-  const formData = new FormData();
+  const formData = new FormData(); // to send to django -- collects all current checkboxes and slider values 
   formData.append('gaussian', gaussianCheckbox.checked ? 'true' : 'false');
   formData.append('clahe', clahecheckbox.checked ? 'true' : 'false');
   formData.append('sauvola', sauvolaCheckbox.checked ? 'true' : 'false');
@@ -557,13 +556,14 @@ function runPreprocessing() {
   formData.append('k', kSlider.value / 100);
   // formData.append('opening_size', openingSlider.value);
 
+  // sending to django which will run the actual image processing in python
   fetch(`/preprocess/${currentDocId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken') },
     body: formData,
   })
     .then((res) => res.json())
-    .then((data) => {
+    .then((data) => { // handle the response (cleaned data) from django
       if (data.success) {
         afterUrl = data.new_url + '?t=' + Date.now();
         beforeAfterToggle.style.display = 'flex';
@@ -571,31 +571,34 @@ function runPreprocessing() {
       }
     })
     .finally(() => {
-      document.getElementById('processing-overlay').style.display = 'none';
+      document.getElementById('processing-overlay').style.display = 'none';// then hide the spinner 
     });
 }
 
-
+// wait 3ms after slider has been changed before sending it to django -- otherwise the slider would send hundreds of requests per second to django
 let sliderDebounce;
 function debouncedRun() {
   clearTimeout(sliderDebounce);
-  sliderDebounce = setTimeout(runPreprocessing, 300);
+  sliderDebounce = setTimeout(runPreprocessing, 400);
 }
 
+
+// this is when we click the gaussian tick -- 
+// this highlights the card visually, shwos the kernel and sigma slides, and runs preprocessing immediately
 gaussianCheckbox.addEventListener('change', () => {
   gaussianCheckbox.closest('.option-card').classList.toggle('checked', gaussianCheckbox.checked);
   kernelRow.style.display = gaussianCheckbox.checked ? 'flex' : 'none';
   sigmaRow.style.display = gaussianCheckbox.checked ? 'flex' : 'none';
   runPreprocessing();
 });
-
+//same
 sauvolaCheckbox.addEventListener('change', () => {
   sauvolaCheckbox.closest('.option-card').classList.toggle('checked', sauvolaCheckbox.checked);
   windowRow.style.display = sauvolaCheckbox.checked ? 'flex' : 'none';
   kRow.style.display = sauvolaCheckbox.checked ? 'flex' : 'none';
   runPreprocessing();
 });
-
+// same
 clahecheckbox.addEventListener('change', () => {
   clahecheckbox.closest('.option-card').classList.toggle('checked', clahecheckbox.checked);
   clipRow.style.display = clahecheckbox.checked ? 'flex' : 'none';
@@ -605,63 +608,55 @@ clahecheckbox.addEventListener('change', () => {
 
 
 
-kernelSlider.addEventListener('input', () => { kernelValue.textContent = kernelSlider.value; debouncedRun(); });
-sigmaSlider.addEventListener('input', () => { sigmaValue.textContent = sigmaSlider.value; debouncedRun(); });
-windowSlider.addEventListener('input', () => { windowValue.textContent = windowSlider.value; debouncedRun(); });
+kernelSlider.addEventListener('input', () => { kernelValue.textContent = kernelSlider.value; debouncedRun(); }); // update the number shown and run after 300ms pause
+sigmaSlider.addEventListener('input', () => { sigmaValue.textContent = sigmaSlider.value; debouncedRun(); }); // update the number shown and run after 300ms pause
+windowSlider.addEventListener('input', () => { windowValue.textContent = windowSlider.value; debouncedRun(); }); // same ...
 kSlider.addEventListener('input', () => { kValue.textContent = (kSlider.value / 100).toFixed(2); debouncedRun(); });
 clipSlider.addEventListener('input', () => { clipValue.textContent = (clipSlider.value / 10).toFixed(1); debouncedRun(); });
 tileSlider.addEventListener('input', () => { tileValue.textContent = tileSlider.value; debouncedRun(); });
-// openingSlider.addEventListener('input', () => { openingValue.textContent = openingSlider.value; debouncedRun(); });
 
 
-
-// toggle for before after
-const beforeAfterToggle = document.getElementById('before-after-toggle');
-const beforeBtn = document.getElementById('before-btn');
-const afterBtn = document.getElementById('after-btn');
-
-let beforeUrl = lockedImageUrl;
-let afterUrl = processedImageUrl;
-
-
-if (afterUrl) {
-  beforeAfterToggle.style.display = 'flex';
-}
-
-
-function setMode(mode) {
-  beforeBtn.classList.toggle('active', mode === 'before');
-  afterBtn.classList.toggle('active', mode === 'after');
-  previewImage.src = mode === 'before' ? beforeUrl : afterUrl;
+// run segementation step button
+document.getElementById('run-segmentation-btn').addEventListener('click', () => {
+  fetch(`/advance-segmentation/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
 
 
-}
+///////////////////////////////// STEP 2: SEGMENTATION /////////////////////////////////
 
-beforeBtn.addEventListener('click', () => setMode('before'));
-afterBtn.addEventListener('click', () => setMode('after'));
-
-// segmentation
-
-
-const paddingControls = document.getElementById('padding-controls');
+// these are the 4 sliders which moves polygons
 const paddingTop = document.getElementById('padding-top');
 const paddingBottom = document.getElementById('padding-bottom');
 const paddingLeft = document.getElementById('padding-left');
 const paddingRight = document.getElementById('padding-right');
 
 let basePolygons = {};
-
+let originalPolygons = {}; // shape of the polygon before adding any padding
+let linePaddingValues = {}; // last slider value per line
+// taking a snapshot of the polygon position before padding is added to maintain the consistency adn to avoid doublel shifts
 function captureBasePolygons() {
   basePolygons = {};
   selectedIndices.forEach((idx) => {
     if (segmentationLines[idx]) {
-      basePolygons[idx] = segmentationLines[idx].polygon.map(p => [p[0], p[1]]);
+      if (!originalPolygons[idx]) {
+        originalPolygons[idx] = segmentationLines[idx].polygon.map(p => [p[0], p[1]]);
+      }
+      basePolygons[idx] = originalPolygons[idx].map(p => [p[0], p[1]]);
     }
   });
 }
 
 function applyPadding() {
-  const top = parseFloat(paddingTop.value);
+  const top = parseFloat(paddingTop.value); 
   const bottom = parseFloat(paddingBottom.value);
   const left = parseFloat(paddingLeft.value);
   const right = parseFloat(paddingRight.value);
@@ -684,10 +679,13 @@ function applyPadding() {
       else newX = x + right;
       return [newX, newY];
     });
+
+    linePaddingValues[idx] = { top, bottom, left, right };   // ← ADD THIS LINE
   });
 
   renderOverlay();
 }
+
 
 let paddingDebounce;
 function debouncedApplyPadding() {
@@ -699,34 +697,25 @@ function debouncedApplyPadding() {
 
 [paddingTop, paddingBottom, paddingLeft, paddingRight].forEach((slider) => {
   slider.addEventListener('mousedown', () => {
-    pushHistory();
-    isAdjustingPadding = true;
+    pushHistory(); // save state for undo 
+    isAdjustingPadding = true; //hides the corner points when we are adjusting the padding
     renderOverlay();
   });
   slider.addEventListener('input', () => {
-    applyPadding();
-    debouncedApplyPadding();
+    applyPadding(); // update polygon live as we drag
+    debouncedApplyPadding(); // saving in 400ms pause
   });
   slider.addEventListener('mouseup', () => {
-    isAdjustingPadding = false;
+    isAdjustingPadding = false; // handles for dragging reappear
     renderOverlay();
   });
 });
 
-document.getElementById('run-segmentation-btn').addEventListener('click', () => {
-  fetch(`/advance-segmentation/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        location.reload();
-      }
-    });
-});
 
-// kraken
+
+///////////////////////////////// SEGMENTATION: Kraken /////////////////////////////////
+
+// run segemnetation model button
 document.getElementById('run-segmentation-model-btn').addEventListener('click', () => {
   if (segmentationLines.length > 0) {
     const confirmed = confirm('This will replace your existing segmentation lines. Continue?');
@@ -734,54 +723,92 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
   }
 
   document.getElementById('processing-overlay').style.display = 'flex';
-
+  // send to django to un kraken
   fetch(`/segment/${currentDocId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken') },
   })
     .then((res) => res.json())
-    .then((data) => {
+    .then((data) => { // django sends the detected lines back
       if (data.success) {
-        drawLineOverlay(data.lines, data.page_width, data.page_height);
-        autoSaveSegmentation();
-        document.getElementById('advance-to-ocr-btn').disabled = false;
-
+        drawLineOverlay(data.lines, data.page_width, data.page_height);  // draws them on screen 
+        autoSaveSegmentation(); // saves then 
+        document.getElementById('advance-to-ocr-btn').disabled = false; // enables the next step button
       }
     })
     .finally(() => {
-      document.getElementById('processing-overlay').style.display = 'none';
+      document.getElementById('processing-overlay').style.display = 'none'; // always hide the spinner when done
     });
 });
 
-let segmentationLines = [];
-let selectedIndices = new Set();
-let hoveredLineIndex = null;
-let isAdjustingPadding = false;
 
-let overlayPageWidth, overlayPageHeight;
-let showPolygons = true;
-let showBaselines = docStatus !== 'ocr_done';
-const isReadOnlyOverlay = docStatus === 'ocr_done';
+///////////////////////////////// SEGMENTATION: polygons and overlays /////////////////////////////////
+
+let segmentationLines = []; // all the polygon lines on the image
+let selectedIndices = new Set(); // which line currently selected -- orange
+let hoveredLineIndex = null; // which line mouse is hoveing at ?
+let isAdjustingPadding = false; // is the user dragging a padding slider
+let overlayPageWidth, overlayPageHeight; // dimensions of the original image
+let showPolygons = true; // are polygons visible?
+// OCR
+let showBaselines = docStatus !== 'ocr_done'; // hide baselines in OCR mode
+const isReadOnlyOverlay = docStatus === 'ocr_done'; // not allowed to edit segmentation in OCR mode
 
 
+// scaling the image so that the kraken polygons can fit somehow
 function getOverlayScale() {
+  // const referenceWidth = previewImage.getBoundingClientRect().width;
   const referenceWidth = 1500;
   return overlayPageWidth / referenceWidth;
 }
 
-
+// stroes the lines and draws then 
 function drawLineOverlay(lines, pageWidth, pageHeight) {
-  if (segmentationLines.length > 0) pushHistory();
-  segmentationLines = lines.map(l => ({
-    polygon: l.polygon.map(p => [p[0], p[1]]),
-    baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [],
+  if (segmentationLines.length > 0) pushHistory(); // if there are already lines on screen -- save them 
+  segmentationLines = lines.map(l => ({ // takes the lines django sent back and has 2 things: polygon and baseline
+    polygon: l.polygon.map(p => [p[0], p[1]]), // p[0] -- x coord , p[1] -- y coord
+    baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [], // is baselines ecist copy it, or else use empty array instead
   }));
-  selectedIndices = new Set();
-  overlayPageWidth = pageWidth;
+  selectedIndices = new Set(); // after drawing, we just dont want to select anything by default, so it just makes sure nothign i selecting by resetting it to an empty index
+  overlayPageWidth = pageWidth; 
   overlayPageHeight = pageHeight;
-  document.getElementById('overlay-toggle-group').style.display = 'flex';
-  renderOverlay();
+  document.getElementById('overlay-toggle-group').style.display = 'flex'; // show the checbox of polygon and basleline when the lines are drawn
+  renderOverlay(); // actually draw everything on screen 
 }
+
+
+
+
+function startVertexDrag(e, lineIndex, vertexIndex, type) {
+  e.stopPropagation();
+  e.preventDefault();
+  pushHistory();
+
+  const svg = document.getElementById('line-overlay');
+  // tricky because the mouse gives coordinates in screen pixels and the SVG uses image coordinates so the function converts between the two using a transformation matrix
+  function screenToSvgPoint(clientX, clientY) {
+    const pt = new DOMPoint(clientX, clientY);
+    const ctm = svg.getScreenCTM().inverse();
+    return pt.matrixTransform(ctm);
+  }
+
+  function onMouseMove(moveEvent) {
+    const svgPoint = screenToSvgPoint(moveEvent.clientX, moveEvent.clientY);
+    segmentationLines[lineIndex][type][vertexIndex] = [svgPoint.x, svgPoint.y];
+    renderOverlay(); // updates as added - redrawn immediately
+  }
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    debouncedSaveSegmentation();
+  }
+
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
+
 
 function renderOverlay() {
   
@@ -791,9 +818,12 @@ function renderOverlay() {
   svg.style.display = (segmentationLines.length || isDrawingBaseline) ? 'block' : 'none';
   const scale = getOverlayScale();
 
+  // loop through each line 
   segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
 
+
+    // draw the polygons - but creating scg polygons with coordinates
     if (showPolygons) {
       const polygonHalo = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
       polygonHalo.setAttribute('points', points);
@@ -810,32 +840,36 @@ function renderOverlay() {
       const isSelected = selectedIndices.has(index);
       polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (isSelected ? 'rgba(168,81,46,0.30)' : 'rgba(30,90,200,0.22)'));
       polygon.setAttribute('stroke', isHovered ? 'none' : (isSelected ? '#A8512E' : '#1E3A5F'));
-      polygon.setAttribute('stroke-width', (isHovered ? 0 : (isSelected ? 2.5 : 0)) * scale);
+      polygon.setAttribute('stroke-width', (isHovered ? 0 : (isSelected ? 4 : 0)) * scale);
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = isReadOnlyOverlay ? 'not-allowed' : 'pointer';
+
+      // polygon clicking behaviour
       if (!isReadOnlyOverlay) {
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (didDrag) return;
-          if (e.metaKey || e.ctrlKey) {
+          if (didDrag) return; // if the user was dragging and not clicking - pls ignore
+          if (e.metaKey || e.ctrlKey) { // cntrl + click -- add / remove from selection 
             if (selectedIndices.has(index)) {
               selectedIndices.delete(index);
             } else {
               selectedIndices.add(index);
             }
           } else {
-            selectedIndices = new Set([index]);
+            selectedIndices = new Set([index]); // normal click -- select only this one 
           }
           if (paddingTop) {
-            paddingTop.value = 0;
-            paddingBottom.value = 0;
-            paddingLeft.value = 0;
-            paddingRight.value = 0;
+            const saved = linePaddingValues[index] || { top: 0, bottom: 0, left: 0, right: 0 };
+            paddingTop.value = saved.top;
+            paddingBottom.value = saved.bottom;
+            paddingLeft.value = saved.left;
+            paddingRight.value = saved.right;
             captureBasePolygons();
           }
-          renderOverlay();
+          renderOverlay(); // just redraw the updated
         });
       } else {
+        // in OCR mode -- the clikcing highlights the ocr results instead
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
           if (didDrag) return;
@@ -845,6 +879,8 @@ function renderOverlay() {
       svg.appendChild(polygon);
     }
 
+
+    // drawign the baseline -- the one krakne predicted
     if (showBaselines && line.baseline && line.baseline.length > 0) {
       const baselinePoints = line.baseline.map(p => p.join(',')).join(' ');
     
@@ -859,13 +895,15 @@ function renderOverlay() {
     }
   });
 
+
+  // drawing dragebale handles in selected polygon  -- when the corner is slee ted the startVertexDrag is started which moves that corner
   if (!isReadOnlyOverlay && !isAdjustingPadding) {
     selectedIndices.forEach((selIndex) => {
       if (!segmentationLines[selIndex]) return;
     
       if (showPolygons) {
       segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
-        const size = 14 * scale;
+        const size = 22 * scale;
         const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         square.setAttribute('x', point[0] - size / 2);
         square.setAttribute('y', point[1] - size / 2);
@@ -890,8 +928,8 @@ function renderOverlay() {
       baselinePoints.forEach((point, vIndex) => {
         if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
   
-        const width = 16 * scale;
-        const height = 16 * scale;
+        const width = 24 * scale;
+        const height = 24 * scale;
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', point[0] - width / 2);
         rect.setAttribute('y', point[1] - height / 2);
@@ -911,29 +949,15 @@ function renderOverlay() {
   });
   
   updateHandleCounterScale();
-
-
 }
+
+// shows delete button and padding controls when somehting is selected 
 document.getElementById('delete-line-btn').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
 document.getElementById('padding-controls').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
 
 }
 
-
-let toastTimeout;
-function showReadOnlyToast() {
-  const toast = document.getElementById('readonly-toast');
-  toast.style.display = 'block';
-  toast.classList.add('visible');
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => {
-    toast.classList.remove('visible');
-    setTimeout(() => {
-      toast.style.display = 'none';
-    }, 200);
-  }, 2200);
-}
-
+// restrore page, lines segments image etc when reloaded
 overlayPageWidth = savedPageWidth;
 overlayPageHeight = savedPageHeight;
 
@@ -941,6 +965,8 @@ if (savedLines && savedLines.length > 0 && (docStatus === 'segmented' || docStat
   drawLineOverlay(savedLines, savedPageWidth, savedPageHeight);
 }
 
+
+// the checkboxes on the preview bar //
 document.getElementById('show-polygons-checkbox').addEventListener('change', (e) => {
   showPolygons = e.target.checked;
   renderOverlay();
@@ -951,76 +977,40 @@ document.getElementById('show-baselines-checkbox').addEventListener('change', (e
   renderOverlay();
 });
 
-//
-function selectOcrResultForLine(lineIndex) {
-  const resultsDiv = document.getElementById('ocr-results');
-  if (!resultsDiv) return;
-
-  const row = resultsDiv.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
-  if (!row) return;
-
-  resultsDiv.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
-  row.classList.add('selected');
-  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  selectedIndices = new Set([lineIndex]);
-  renderOverlay();
-}
-
-function setupOcrHoverHighlight() {
-  const resultsDiv = document.getElementById('ocr-results');
-  if (!resultsDiv) return;
-
-  resultsDiv.addEventListener('mouseover', (e) => {
-    const row = e.target.closest('.ocr-line-result');
-    if (!row) return;
-    const idx = parseInt(row.dataset.lineIndex, 10);
-    if (!isNaN(idx)) {
-      hoveredLineIndex = idx;
-      renderOverlay();
-    }
-  });
-
-  resultsDiv.addEventListener('mouseout', (e) => {
-    const row = e.target.closest('.ocr-line-result');
-    if (!row) return;
-    hoveredLineIndex = null;
-    renderOverlay();
-  });
-}
-
-setupOcrHoverHighlight();
-
-function startVertexDrag(e, lineIndex, vertexIndex, type) {
-  e.stopPropagation();
-  e.preventDefault();
-  pushHistory();
-
-  const svg = document.getElementById('line-overlay');
-
-  function screenToSvgPoint(clientX, clientY) {
-    const pt = new DOMPoint(clientX, clientY);
-    const ctm = svg.getScreenCTM().inverse();
-    return pt.matrixTransform(ctm);
-  }
-
-  function onMouseMove(moveEvent) {
-    const svgPoint = screenToSvgPoint(moveEvent.clientX, moveEvent.clientY);
-    segmentationLines[lineIndex][type][vertexIndex] = [svgPoint.x, svgPoint.y];
-    renderOverlay();
-  }
-  function onMouseUp() {
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-    debouncedSaveSegmentation();
-  }
 
 
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
-}
+// forward and back buttons
+document.getElementById('back-to-preprocessing-btn').addEventListener('click', () => {
+  fetch(`/back-to-preprocessing/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
 
 
+document.getElementById('advance-to-ocr-btn').addEventListener('click', () => {
+  fetch(`/advance-ocr/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
+
+
+
+
+// auto save segmentation block
 document.getElementById('delete-line-btn').addEventListener('click', () => {
   pushHistory();
   segmentationLines = segmentationLines.filter((_, i) => !selectedIndices.has(i));
@@ -1051,31 +1041,36 @@ function autoSaveSegmentation() {
     });
 }
 
+
+//  save the lines 
 function debouncedSaveSegmentation() {
   clearTimeout(segmentationSaveDebounce);
-  segmentationSaveDebounce = setTimeout(autoSaveSegmentation, 600);
+  segmentationSaveDebounce = setTimeout(autoSaveSegmentation, 600); // wait 6 sec before saving the polygon drags to django 
 }
 
 function updateHandleCounterScale() {
-  const counterScale = 1 / Math.sqrt(Math.max(zoomLevel, 0.5));
+  const counterScale = 1 / Math.sqrt(Math.max(zoomLevel, 0.5)); // scales the handles smaller when zoomed
   document.querySelectorAll('.overlay-handle').forEach((el) => {
     el.style.transform = `scale(${counterScale})`;
   });
 }
 
+// zooming with the overlays
 function applyZoom() {
   const transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
-  previewImage.style.transform = transform;
+  previewImage.style.transform = transform; // move + scale the image
 
-  const lineOverlay = document.getElementById('line-overlay');
+  const lineOverlay = document.getElementById('line-overlay'); // move + scale the overlay too 
   if (lineOverlay) {
     lineOverlay.style.transform = transform;
     lineOverlay.style.transformOrigin = previewImage.style.transformOrigin || 'center center';
   }
 
-  updateHandleCounterScale();
+  updateHandleCounterScale(); // keeps the handles the right size
 }
 
+
+// download image button
 document.getElementById('download-image-btn').addEventListener('click', () => {
   const link = document.createElement('a');
   link.href = previewImage.src;
@@ -1087,13 +1082,159 @@ document.getElementById('download-image-btn').addEventListener('click', () => {
 
 
 
+// select button when we click somehwere in the background or not polygon in the preview
+function deselectIfEmpty(e) {
+  if (didDrag) return;
+  if (isDrawingBaseline) return;
+  if (selectedIndices.size === 0) return;
+  selectedIndices = new Set();
+  if (paddingTop) {
+    paddingTop.value = 0;
+    paddingBottom.value = 0;
+    paddingLeft.value = 0;
+    paddingRight.value = 0;
+  }
+  document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
+  renderOverlay();
+}
 
-//// draw baseline
+previewImage.addEventListener('click', deselectIfEmpty);
+document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
 
 
 
-let isDrawingBaseline = false;
-let drawnBaselinePoints = [];
+
+///////////////////////////////////  OCR? ///////////////////////////////////
+
+// when we click a polygon in OCR mode
+// find the mathcing result row -- highlight it -- scroll to it -- highlight the polygon ornage 
+function selectOcrResultForLine(lineIndex) {
+  const resultsDiv = document.getElementById('ocr-results');
+  if (!resultsDiv) return;
+
+  const row = resultsDiv.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
+  if (!row) return;
+
+  resultsDiv.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
+  row.classList.add('selected');
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  selectedIndices = new Set([lineIndex]);
+  renderOverlay();
+}
+
+function setupOcrHoverHighlight() {
+  const resultsDiv = document.getElementById('ocr-results');
+  if (!resultsDiv) return;
+
+  // hover over result -- highlight polygon
+  resultsDiv.addEventListener('mouseover', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    hoveredLineIndex = parseInt(row.dataset.lineIndex);
+    renderOverlay();
+  });
+
+  // mouse leaves results -- unhighlight polygon
+  resultsDiv.addEventListener('mouseout', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    hoveredLineIndex = null;
+    renderOverlay();
+  });
+
+  // click result row maching polygon
+  resultsDiv.addEventListener('click', (e) => {
+    const row = e.target.closest('.ocr-line-result');
+    if (!row) return;
+    const lineIndex = parseInt(row.dataset.lineIndex);
+    hoveredLineIndex = null;        // ← add this
+    selectedIndices = new Set([lineIndex]);
+    renderOverlay();                // only one renderOverlay call now
+  });
+}
+
+setupOcrHoverHighlight();
+
+
+
+
+//////////////////////////////////// OCR Confidence ////////////////////////////////////
+const confidenceCheckbox = document.getElementById('show-confidence-checkbox');
+
+// confidence checkbox
+function applyConfidenceVisibility() {
+  const showConfidence = confidenceCheckbox.checked;
+  document.querySelectorAll('.ocr-line-text').forEach((el) => {
+    el.innerHTML = showConfidence ? el.dataset.html : el.dataset.plain;
+  });
+}
+
+confidenceCheckbox.addEventListener('change', applyConfidenceVisibility);
+applyConfidenceVisibility();
+
+
+// run ocr button - 
+document.getElementById('run-ocr-btn').addEventListener('click', () => {
+  document.getElementById('processing-overlay').style.display = 'flex';
+
+  fetch(`/run-ocr/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        const resultsDiv = document.getElementById('ocr-results');
+        resultsDiv.innerHTML = '';
+        data.predictions.forEach((pred, i) => {
+          const row = document.createElement('div'); // create a row
+          row.className = 'ocr-line-result';
+          row.dataset.lineIndex = pred.line_index; // link to polygon
+          const textSpan = document.createElement('span');  // create text
+          textSpan.className = 'ocr-line-text';
+          textSpan.dataset.html = pred.html; // stored coloured version
+          textSpan.dataset.plain = pred.text; // store plain version
+          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text; 
+    
+          const numberSpan = document.createElement('span'); // creating line number
+          numberSpan.className = 'ocr-line-number'; // 1,2,3
+          numberSpan.textContent = i + 1;
+    
+          row.appendChild(numberSpan); // add number to the rows
+          row.appendChild(textSpan); // displaying text to the rows 
+          resultsDiv.appendChild(row);
+        });
+        document.getElementById('ocr-results-panel').style.display = 'flex'; 
+        document.getElementById('ocr-stale-warning').style.display = 'none';
+
+      }
+    })
+    .finally(() => {
+      document.getElementById('processing-overlay').style.display = 'none';
+    });
+});
+
+
+
+// back button
+document.getElementById('back-to-segmentation-btn').addEventListener('click', () => {
+  fetch(`/back-to-segmentation/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        location.reload();
+      }
+    });
+});
+
+
+///////////////////////////////// SEGMENTATION: Draw baseline /////////////////////////////////
+let isDrawingBaseline = false; // are we in drawign mode?
+let drawnBaselinePoints = []; // the points the user has clicked so far
 
 const drawBaselineBtn = document.getElementById('draw-baseline-btn');
 const drawBaselineActions = document.getElementById('draw-baseline-actions');
@@ -1101,14 +1242,16 @@ const finishBaselineBtn = document.getElementById('finish-baseline-btn');
 const cancelBaselineBtn = document.getElementById('cancel-baseline-btn');
 const lineOverlay = document.getElementById('line-overlay');
 
-if (drawBaselineBtn) {
+if (drawBaselineBtn) { // only draw if the button exists ont his page 
 
+  // like before -- converts mouse screen position to image coordinates
 function screenToImagePoint(clientX, clientY) {
   const pt = new DOMPoint(clientX, clientY);
   const ctm = lineOverlay.getScreenCTM().inverse();
   const svgPoint = pt.matrixTransform(ctm);
   return [svgPoint.x, svgPoint.y];
 }
+
 
 lineOverlay.addEventListener('mousemove', (e) => {
   if (!isDrawingBaseline || drawnBaselinePoints.length === 0) return;
@@ -1117,35 +1260,25 @@ lineOverlay.addEventListener('mousemove', (e) => {
   renderDrawingPreview(currentPoint);
 });
 
-// document.addEventListener('keydown', (e) => {
-//   if (!isDrawingBaseline) return;
-//   if (e.key === 'Backspace' || e.key === 'Delete') {
-//     e.preventDefault();
-//     drawnBaselinePoints.pop();
-//     renderDrawingPreview();
-//   }
-// });
 
+
+// keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (!isDrawingBaseline) return;
-  if (e.key === 'Backspace' || e.key === 'Delete') {
+  if (e.key === 'Backspace' || e.key === 'Delete') { // removing last point
     e.preventDefault();
     drawnBaselinePoints.pop();
     renderDrawingPreview();
   }
+
+  // finish drawing 
   if (e.key === 'Enter') {
     e.preventDefault();
     finishBaselineBtn.click();
   }
 });
 
-// lineOverlay.addEventListener('dblclick', (e) => {
-//   if (!isDrawingBaseline) return;
-//   e.preventDefault();
-//   finishBaselineBtn.click();
-// });
-
-
+// start drwsing shwos crosshair cursar making the overlay clicable 
 drawBaselineBtn.addEventListener('click', () => {
   isDrawingBaseline = true;
   drawnBaselinePoints = [];
@@ -1187,6 +1320,8 @@ function isPointInsideImage(clientX, clientY) {
   );
 }
 
+
+// clicking to add points 
 lineOverlay.addEventListener('click', (e) => {
   if (!isDrawingBaseline || didDrag) return;
   if (!isPointInsideImage(e.clientX, e.clientY)) return;
@@ -1268,7 +1403,7 @@ finishBaselineBtn.addEventListener('click', () => {
 
 
 
-
+// undo button?
 let segmentationHistory = [];
 
 function pushHistory() {
@@ -1289,252 +1424,12 @@ document.getElementById('undo-segmentation-btn').addEventListener('click', () =>
   }
 });
 
-document.getElementById('back-to-preprocessing-btn').addEventListener('click', () => {
-  fetch(`/back-to-preprocessing/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        location.reload();
-      }
-    });
-});
-
-
-document.getElementById('advance-to-ocr-btn').addEventListener('click', () => {
-  fetch(`/advance-ocr/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        location.reload();
-      }
-    });
-});
-
-
-document.getElementById('back-to-segmentation-btn').addEventListener('click', () => {
-  fetch(`/back-to-segmentation/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        location.reload();
-      }
-    });
-});
-
-
-// OCR 
-const confidenceCheckbox = document.getElementById('show-confidence-checkbox');
-
-function applyConfidenceVisibility() {
-  const showConfidence = confidenceCheckbox.checked;
-  document.querySelectorAll('.ocr-line-text').forEach((el) => {
-    el.innerHTML = showConfidence ? el.dataset.html : el.dataset.plain;
-  });
-}
-
-confidenceCheckbox.addEventListener('change', applyConfidenceVisibility);
-applyConfidenceVisibility();
-
-
-document.getElementById('run-ocr-btn').addEventListener('click', () => {
-  document.getElementById('processing-overlay').style.display = 'flex';
-
-  fetch(`/run-ocr/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        const resultsDiv = document.getElementById('ocr-results');
-        resultsDiv.innerHTML = '';
-        data.predictions.forEach((pred, i) => {
-          const row = document.createElement('div');
-          row.className = 'ocr-line-result';
-          row.dataset.lineIndex = pred.line_index;
-          const textSpan = document.createElement('span');
-          textSpan.className = 'ocr-line-text';
-          textSpan.dataset.html = pred.html;
-          textSpan.dataset.plain = pred.text;
-          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
-    
-          const numberSpan = document.createElement('span');
-          numberSpan.className = 'ocr-line-number';
-          numberSpan.textContent = i + 1;
-    
-          row.appendChild(numberSpan);
-          row.appendChild(textSpan);
-          resultsDiv.appendChild(row);
-        });
-        document.getElementById('ocr-results-panel').style.display = 'flex'; 
-        document.getElementById('ocr-stale-warning').style.display = 'none';
-
-      }
-    })
-    .finally(() => {
-      document.getElementById('processing-overlay').style.display = 'none';
-    });
-});
 
 
 
-function deselectIfEmpty(e) {
-  if (didDrag) return;
-  if (isDrawingBaseline) return;
-  if (selectedIndices.size === 0) return;
-  selectedIndices = new Set();
-  if (paddingTop) {
-    paddingTop.value = 0;
-    paddingBottom.value = 0;
-    paddingLeft.value = 0;
-    paddingRight.value = 0;
-  }
-  document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
-  renderOverlay();
-}
-
-previewImage.addEventListener('click', deselectIfEmpty);
-document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
 
 
-function fitTextToImageWidth(text, whiteLeftFrac = 0, whiteWidthFrac = 1) {
-  const popupImg = document.getElementById('line-popup-img');
-  const textEl = document.getElementById('line-popup-text');
-
-  const imageWidth = popupImg.clientWidth || popupImg.naturalWidth;
-  const targetWidth = imageWidth * whiteWidthFrac;
-  const leftOffset = imageWidth * whiteLeftFrac;
-
-  // Measure the text's actual rendered width at a baseline font size,
-  // then scale it so the line exactly spans the white region.
-  const baseFontSize = 24;
-  textEl.style.whiteSpace = 'nowrap';
-  textEl.style.display = 'inline-block';
-  textEl.style.width = 'auto';
-  textEl.style.fontSize = baseFontSize + 'px';
-
-  const measuredWidth = textEl.scrollWidth || 1;
-  let fontSize = (targetWidth / measuredWidth) * baseFontSize;
-  fontSize = Math.min(Math.max(fontSize, 14), 64);
-
-  textEl.style.fontSize = fontSize + 'px';
-  textEl.style.whiteSpace = 'normal';
-  textEl.style.display = 'block';
-  textEl.style.width = targetWidth + 'px';
-  textEl.style.marginLeft = leftOffset + 'px';
-  textEl.style.marginRight = 'auto';
-}
-
-
-let currentPopupText = '';
-let currentPopupHtml = '';
-
-function openLinePreviewPopup(lineIndex, predText, predHtml) {
-  const line = segmentationLines[lineIndex];
-  if (!line || !line.polygon || line.polygon.length < 3) return;
-
-  const polygon = line.polygon;
-  const xs = polygon.map(p => p[0]);
-  const ys = polygon.map(p => p[1]);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-
-  // Wider padding than before, so there's visible context around the polygon.
-  const padX = (maxX - minX) * 0.08 + 8;
-  const padY = (maxY - minY) * 0.18 + 8;
-  const cropX = Math.max(0, minX - padX);
-  const cropY = Math.max(0, minY - padY);
-  const cropW = Math.min(previewImage.naturalWidth - cropX, (maxX - minX) + padX * 2);
-  const cropH = Math.min(previewImage.naturalHeight - cropY, (maxY - minY) + padY * 2);
-  const whiteLeftFrac = (minX - cropX) / cropW;
-  const whiteWidthFrac = (maxX - minX) / cropW;
-  const canvas = document.createElement('canvas');
-  canvas.width = cropW;
-  canvas.height = cropH;
-  const ctx = canvas.getContext('2d');
-
-  // 1. Draw the full crop region at normal brightness — gives surrounding context.
-  ctx.drawImage(previewImage, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-  // 2. Dim everything...
-  ctx.save();
-  ctx.fillStyle = 'rgba(20,20,20,0.6)';
-  ctx.fillRect(0, 0, cropW, cropH);
-  ctx.restore();
-
-  // 3. ...except re-draw the polygon region at full brightness, so it "pops"
-  //    against the dimmed surroundings. This is the exact region used for the prediction.
-  ctx.save();
-  ctx.beginPath();
-  polygon.forEach((p, i) => {
-    const x = p[0] - cropX;
-    const y = p[1] - cropY;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(previewImage, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-  ctx.restore();
-
-  // 4. Outline the polygon so the boundary is unambiguous.
-  ctx.beginPath();
-  polygon.forEach((p, i) => {
-    const x = p[0] - cropX;
-    const y = p[1] - cropY;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.closePath();
-  ctx.strokeStyle = 'rgba(30,144,255,0.9)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  document.getElementById('line-popup-img').src = canvas.toDataURL('image/png');
-  document.getElementById('line-popup-text').innerHTML =
-    confidenceCheckbox.checked ? predHtml : predText;
-  
-  // Wait a tick for the image to lay out before measuring its width.
-  requestAnimationFrame(() => fitTextToImageWidth(predText, whiteLeftFrac, whiteWidthFrac));
-
-  
-  document.getElementById('line-popup-backdrop').style.display = 'flex';
-}
-
-function setupOcrClickPopup() {
-  const resultsDiv = document.getElementById('ocr-results');
-  if (!resultsDiv) return;
-
-  resultsDiv.addEventListener('click', (e) => {
-    const row = e.target.closest('.ocr-line-result');
-    if (!row) return;
-    const idx = parseInt(row.dataset.lineIndex, 10);
-    if (isNaN(idx)) return;
-    const textSpan = row.querySelector('.ocr-line-text');
-    openLinePreviewPopup(idx, textSpan.dataset.plain, textSpan.dataset.html);
-  });
-}
-
-document.getElementById('line-popup-backdrop').addEventListener('click', (e) => {
-  if (e.target.id === 'line-popup-backdrop' || e.target.id === 'line-popup-close') {
-    document.getElementById('line-popup-backdrop').style.display = 'none';
-  }
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    document.getElementById('line-popup-backdrop').style.display = 'none';
-  }
-});
-
-
+///////////////////////////////// INFO / MANUAL /////////////////////////////////
 const infoModalBackdrop = document.getElementById('info-modal-backdrop');
 const infoModalTitle = document.getElementById('info-modal-title');
 const infoModalBody = document.getElementById('info-modal-body');
@@ -1632,8 +1527,80 @@ infoModalBackdrop.addEventListener('click', (e) => {
   }
 });
 
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    infoModalBackdrop.style.display = 'none';
+
+///////////////////////////////// OCR EDIT MODE /////////////////////////////////
+const editOcrBtn = document.getElementById('edit-ocr-btn');
+let isEditingOcr = false;
+
+function saveOcrEdits() {
+  const rows = document.querySelectorAll('.ocr-line-result');
+  const updatedPredictions = [];
+
+  rows.forEach((row) => {
+    const lineIndex = parseInt(row.dataset.lineIndex);
+    const textSpan = row.querySelector('.ocr-line-text');
+    const newText = textSpan.innerText.trim();
+    updatedPredictions.push({ line_index: lineIndex, text: newText });
+  });
+
+  fetch(`/edit-ocr/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ predictions: updatedPredictions }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        console.log('OCR edits saved');
+      }
+    });
+}
+
+const nepaliKeyboard = document.getElementById('nepali-keyboard');
+let activeEditableEl = null;
+
+// SINGLE listener now — handles toggle + keyboard + save
+editOcrBtn.addEventListener('click', () => {
+  isEditingOcr = !isEditingOcr;
+
+  document.querySelectorAll('.ocr-line-text').forEach((el) => {
+    el.contentEditable = isEditingOcr;
+  });
+
+  document.querySelectorAll('.ocr-line-result').forEach((row) => {
+    row.classList.toggle('editing-row', isEditingOcr);   // ← toggle on the row
+  });
+
+  nepaliKeyboard.style.display = isEditingOcr ? 'flex' : 'none';
+  editOcrBtn.textContent = isEditingOcr ? 'Save' : 'Edit';
+
+  if (!isEditingOcr) {
+    saveOcrEdits();
+    activeEditableEl = null;
+  }
+});
+
+
+// track which line is currently focused for typing
+document.getElementById('ocr-results').addEventListener('focusin', (e) => {
+  if (e.target.classList.contains('ocr-line-text')) {
+    activeEditableEl = e.target;
+  }
+});
+
+// keyboard button clicks insert at cursor
+nepaliKeyboard.addEventListener('click', (e) => {
+  const btn = e.target.closest('.key');
+  if (!btn || !activeEditableEl) return;
+
+  activeEditableEl.focus();
+  const key = btn.dataset.key;
+
+  if (key === 'backspace') {
+    document.execCommand('delete');
+  } else if (key === 'space') {
+    document.execCommand('insertText', false, ' ');
+  } else {
+    document.execCommand('insertText', false, btn.textContent);
   }
 });

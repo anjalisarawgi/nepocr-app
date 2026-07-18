@@ -935,8 +935,8 @@ nav {
   border-radius: 6px;
   font-size: 10.5px;
   line-height: 1.4;
-  min-width: 180px;
-  max-width: 320px;
+  max-width: 220px;      /* reduced from 320px */
+  width: max-content;     /* size to fit content, not force a minimum */
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
@@ -1293,3 +1293,44 @@ nav {
 }
 
 
+.ocr-line-result.editing-row {
+  background: var(--panel-bg);
+  border-left: 3px solid var(--accent);
+}
+
+.nepali-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.keyboard-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.key {
+  min-width: 34px;
+  padding: 8px 6px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-family: var(--serif);
+  font-size: 15px;
+  cursor: pointer;
+  text-align: center;
+}
+.key:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.key-space {
+  flex: 1;
+  min-width: 100px;
+}
