@@ -849,6 +849,7 @@ function renderOverlay() {
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
           if (didDrag) return; // if the user was dragging and not clicking - pls ignore
+          if (isEditingOcr) return;  // 
           if (e.metaKey || e.ctrlKey) { // cntrl + click -- add / remove from selection 
             if (selectedIndices.has(index)) {
               selectedIndices.delete(index);
@@ -1129,6 +1130,7 @@ function setupOcrHoverHighlight() {
 
   // hover over result -- highlight polygon
   resultsDiv.addEventListener('mouseover', (e) => {
+    if (isEditingOcr) return;   
     const row = e.target.closest('.ocr-line-result');
     if (!row) return;
     hoveredLineIndex = parseInt(row.dataset.lineIndex);
@@ -1145,6 +1147,8 @@ function setupOcrHoverHighlight() {
 
   // click result row maching polygon
   resultsDiv.addEventListener('click', (e) => {
+    if (e.target.closest('.ocr-line-edit-btn')) return;  
+    if (isEditingOcr) return; 
     const row = e.target.closest('.ocr-line-result');
     if (!row) return;
     const lineIndex = parseInt(row.dataset.lineIndex);
@@ -1533,9 +1537,88 @@ infoModalBackdrop.addEventListener('click', (e) => {
 });
 
 
+// ///////////////////////////////// OCR EDIT MODE /////////////////////////////////
+// const editOcrBtn = document.getElementById('edit-ocr-btn');
+// let isEditingOcr = false;
+
+// function saveOcrEdits() {
+//   const rows = document.querySelectorAll('.ocr-line-result');
+//   const updatedPredictions = [];
+
+//   rows.forEach((row) => {
+//     const lineIndex = parseInt(row.dataset.lineIndex);
+//     const textSpan = row.querySelector('.ocr-line-text');
+//     const newText = textSpan.innerText.trim();
+//     updatedPredictions.push({ line_index: lineIndex, text: newText });
+//   });
+
+//   fetch(`/edit-ocr/${currentDocId}/`, {
+//     method: 'POST',
+//     headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ predictions: updatedPredictions }),
+//   })
+//     .then((res) => res.json())
+//     .then((data) => {
+//       if (data.success) {
+//         console.log('OCR edits saved');
+//       }
+//     });
+// }
+
+// const nepaliKeyboard = document.getElementById('nepali-keyboard');
+// let activeEditableEl = null;
+
+// // SINGLE listener now — handles toggle + keyboard + save
+// editOcrBtn.addEventListener('click', () => {
+//   isEditingOcr = !isEditingOcr;
+
+//   document.querySelectorAll('.ocr-line-text').forEach((el) => {
+//     el.contentEditable = isEditingOcr;
+//   });
+
+//   document.querySelectorAll('.ocr-line-result').forEach((row) => {
+//     row.classList.toggle('editing-row', isEditingOcr);   // ← toggle on the row
+//   });
+
+//   nepaliKeyboard.style.display = isEditingOcr ? 'flex' : 'none';
+//   editOcrBtn.textContent = isEditingOcr ? 'Save' : 'Edit';
+
+//   if (!isEditingOcr) {
+//     saveOcrEdits();
+//     activeEditableEl = null;
+//   }
+// });
+
+
+// // track which line is currently focused for typing
+// document.getElementById('ocr-results').addEventListener('focusin', (e) => {
+//   if (e.target.classList.contains('ocr-line-text')) {
+//     activeEditableEl = e.target;
+//   }
+// });
+
+// // keyboard button clicks insert at cursor
+// nepaliKeyboard.addEventListener('click', (e) => {
+//   const btn = e.target.closest('.key');
+//   if (!btn || !activeEditableEl) return;
+
+//   activeEditableEl.focus();
+//   const key = btn.dataset.key;
+
+//   if (key === 'backspace') {
+//     document.execCommand('delete');
+//   } else if (key === 'space') {
+//     document.execCommand('insertText', false, ' ');
+//   } else {
+//     document.execCommand('insertText', false, btn.textContent);
+//   }
+// });
+
 ///////////////////////////////// OCR EDIT MODE /////////////////////////////////
-const editOcrBtn = document.getElementById('edit-ocr-btn');
 let isEditingOcr = false;
+let editingLineIndex = null;
+const nepaliKeyboard = document.getElementById('nepali-keyboard');
+let activeEditableEl = null;
 
 function saveOcrEdits() {
   const rows = document.querySelectorAll('.ocr-line-result');
@@ -1555,45 +1638,123 @@ function saveOcrEdits() {
   })
     .then((res) => res.json())
     .then((data) => {
-      if (data.success) {
-        console.log('OCR edits saved');
-      }
+      if (data.success) console.log('OCR edits saved');
     });
 }
 
-const nepaliKeyboard = document.getElementById('nepali-keyboard');
-let activeEditableEl = null;
+function startEditingLine(lineIndex) {
+  isEditingOcr = true;
+  editingLineIndex = lineIndex;
 
-// SINGLE listener now — handles toggle + keyboard + save
-editOcrBtn.addEventListener('click', () => {
-  isEditingOcr = !isEditingOcr;
+  selectedIndices = new Set([lineIndex]);
+  renderOverlay();
 
-  document.querySelectorAll('.ocr-line-text').forEach((el) => {
-    el.contentEditable = isEditingOcr;
+  document.querySelectorAll('.ocr-line-text').forEach((el) => { el.contentEditable = false; });
+  document.querySelectorAll('.ocr-line-result').forEach((r) => {
+    r.classList.remove('editing-row', 'selected');
   });
-
-  document.querySelectorAll('.ocr-line-result').forEach((row) => {
-    row.classList.toggle('editing-row', isEditingOcr);   // ← toggle on the row
+  document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => {
+    btn.classList.remove('is-saving');
   });
+  // remove any leftover save buttons
+  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove());
 
-  nepaliKeyboard.style.display = isEditingOcr ? 'flex' : 'none';
-  editOcrBtn.textContent = isEditingOcr ? 'Save' : 'Edit';
+  const row = document.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
+  if (!row) return;
 
-  if (!isEditingOcr) {
-    saveOcrEdits();
-    activeEditableEl = null;
+  row.classList.add('editing-row', 'selected');
+  const textSpan = row.querySelector('.ocr-line-text');
+  textSpan.contentEditable = true;
+  textSpan.focus();
+
+  const editBtn = row.querySelector('.ocr-line-edit-btn');
+  editBtn.classList.add('is-saving');
+
+  // inject save button after the text span
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'ocr-save-btn';
+  saveBtn.innerHTML = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>`;
+  saveBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    stopEditingLine();
+  });
+  row.appendChild(saveBtn);
+
+  document.getElementById('ocr-results').classList.add('locked-editing');
+
+  nepaliKeyboard.style.display = 'flex';
+  positionKeyboardBelowLine(row);
+}
+
+function positionKeyboardBelowLine(row) {
+  const rightCol = document.querySelector('.right-col');
+  const rightColRect = rightCol.getBoundingClientRect();
+  const kb = nepaliKeyboard;
+  
+  // reset first so we can measure true height
+  kb.style.top = 'auto';
+  kb.style.bottom = '16px';
+  kb.style.left = 'auto';
+  kb.style.right = (window.innerWidth - rightColRect.left + 8) + 'px';
+
+  // if keyboard is taller than available space, cap it and scroll
+  const maxHeight = window.innerHeight - 32;
+  kb.style.maxHeight = maxHeight + 'px';
+  kb.style.overflowY = kb.scrollHeight > maxHeight ? 'auto' : 'visible';
+}
+
+
+
+
+function stopEditingLine() {
+  isEditingOcr = false;
+  editingLineIndex = null;
+
+  document.querySelectorAll('.ocr-line-text').forEach((el) => { el.contentEditable = false; });
+  document.querySelectorAll('.ocr-line-result').forEach((r) => { r.classList.remove('editing-row'); });
+  document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => { btn.classList.remove('is-saving'); });
+  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove()); // clean up
+
+  document.getElementById('ocr-results').classList.remove('locked-editing');
+  nepaliKeyboard.style.display = 'none';
+
+  // reset position for next time
+  nepaliKeyboard.style.top = 'auto';
+  nepaliKeyboard.style.left = 'auto';
+  nepaliKeyboard.style.bottom = '24px';
+  nepaliKeyboard.style.right = '24px';
+
+  activeEditableEl = null;
+
+  saveOcrEdits();
+}
+
+document.getElementById('ocr-results').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.ocr-line-edit-btn');
+  if (!editBtn) return;
+  e.stopPropagation();
+
+  const row = editBtn.closest('.ocr-line-result');
+  const lineIndex = parseInt(row.dataset.lineIndex);
+
+  if (isEditingOcr && editingLineIndex === lineIndex) {
+    stopEditingLine();       // clicking the checkmark on the active line → save
+  } else if (!isEditingOcr) {
+    startEditingLine(lineIndex);   // clicking pencil on a line → start editing
   }
 });
 
-
-// track which line is currently focused for typing
 document.getElementById('ocr-results').addEventListener('focusin', (e) => {
   if (e.target.classList.contains('ocr-line-text')) {
     activeEditableEl = e.target;
   }
 });
 
-// keyboard button clicks insert at cursor
 nepaliKeyboard.addEventListener('click', (e) => {
   const btn = e.target.closest('.key');
   if (!btn || !activeEditableEl) return;
@@ -1607,5 +1768,69 @@ nepaliKeyboard.addEventListener('click', (e) => {
     document.execCommand('insertText', false, ' ');
   } else {
     document.execCommand('insertText', false, btn.textContent);
+  }
+});
+
+
+// Draggable keyboard
+const keyboard = document.getElementById('nepali-keyboard');
+let kbDragging = false, kbStartX, kbStartY, kbOrigLeft, kbOrigTop;
+
+
+document.querySelector('.keyboard-drag-handle').addEventListener('mousedown', (e) => {
+  kbDragging = true;
+  kbStartX = e.clientX;
+  kbStartY = e.clientY;
+
+  // read current rendered position regardless of which properties are set
+  const rect = keyboard.getBoundingClientRect();
+  kbOrigLeft = rect.left;
+  kbOrigTop = rect.top;
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!kbDragging) return;
+  const dx = e.clientX - kbStartX;
+  const dy = e.clientY - kbStartY;
+
+  // always drag using top/left
+  keyboard.style.bottom = 'auto';
+  keyboard.style.right = 'auto';
+  keyboard.style.top = (kbOrigTop + dy) + 'px';
+  keyboard.style.left = (kbOrigLeft + dx) + 'px';
+});
+
+document.addEventListener('mouseup', () => { kbDragging = false; });
+
+
+// download ocr update
+document.getElementById('download-ocr-btn').addEventListener('click', () => {
+  const rows = document.querySelectorAll('.ocr-line-result');
+  const lines = [];
+
+  rows.forEach((row) => {
+    const textSpan = row.querySelector('.ocr-line-text');
+    if (textSpan) {
+      lines.push(textSpan.innerText.trim());
+    }
+  });
+
+  const text = lines.join('\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `transcription-${currentDocId}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+
+document.querySelector('.right-col').addEventListener('scroll', () => {
+  if (nepaliKeyboard.style.display !== 'none') {
+    positionKeyboardBelowLine(document.querySelector('.ocr-line-result.editing-row'));
   }
 });

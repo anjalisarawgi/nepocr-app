@@ -471,118 +471,35 @@
                         <div class="ocr-line-result" data-line-index="{{ pred.line_index }}">
                           <span class="ocr-line-number">{{ forloop.counter }}</span>
                           <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>
+                          <button type="button" class="ocr-line-edit-btn" title="Edit this line">
+                            <svg class="icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 20h9"/>
+                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                            </svg>
+                            <svg class="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </button>
                         </div>
                       {% endfor %}
                     {% endif %}
                   </div>
               
                   {% if selected_doc %}
-                  <button class="btn-download-txt" id="edit-ocr-btn" type="button">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 20h9"/>
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                    </svg>
-                    Edit
-                  </button>
-                  <a href="{% url 'download_ocr_text' selected_doc.id %}" class="btn-download-txt" id="download-ocr-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                      <line x1="12" y1="11" x2="12" y2="17"/>
-                      <polyline points="9 14 12 17 15 14"/>
-                    </svg>
-                    Download transcription (.txt)
-                  </a>
+                <button type="button" class="btn-download-txt" id="download-ocr-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="12" y1="11" x2="12" y2="17"/>
+                    <polyline points="9 14 12 17 15 14"/>
+                  </svg>
+                  Download transcription (.txt)
+                </button>
                   
                   
                   {% endif %}
                 </div>
               
-                <div id="nepali-keyboard" class="nepali-keyboard" style="display:none;">
-                  <div class="keyboard-row">
-                    <button type="button" class="key">अ</button>
-                    <button type="button" class="key">आ</button>
-                    <button type="button" class="key">इ</button>
-                    <button type="button" class="key">ई</button>
-                    <button type="button" class="key">उ</button>
-                    <button type="button" class="key">ऊ</button>
-                    <button type="button" class="key">ऋ</button>
-                    <button type="button" class="key">ए</button>
-                    <button type="button" class="key">ऐ</button>
-                    <button type="button" class="key">ओ</button>
-                    <button type="button" class="key">औ</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key">क</button>
-                    <button type="button" class="key">ख</button>
-                    <button type="button" class="key">ग</button>
-                    <button type="button" class="key">घ</button>
-                    <button type="button" class="key">ङ</button>
-                    <button type="button" class="key">च</button>
-                    <button type="button" class="key">छ</button>
-                    <button type="button" class="key">ज</button>
-                    <button type="button" class="key">झ</button>
-                    <button type="button" class="key">ञ</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key">ट</button>
-                    <button type="button" class="key">ठ</button>
-                    <button type="button" class="key">ड</button>
-                    <button type="button" class="key">ढ</button>
-                    <button type="button" class="key">ण</button>
-                    <button type="button" class="key">त</button>
-                    <button type="button" class="key">थ</button>
-                    <button type="button" class="key">द</button>
-                    <button type="button" class="key">ध</button>
-                    <button type="button" class="key">न</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key">प</button>
-                    <button type="button" class="key">फ</button>
-                    <button type="button" class="key">ब</button>
-                    <button type="button" class="key">भ</button>
-                    <button type="button" class="key">म</button>
-                    <button type="button" class="key">य</button>
-                    <button type="button" class="key">र</button>
-                    <button type="button" class="key">ल</button>
-                    <button type="button" class="key">व</button>
-                    <button type="button" class="key">स</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key">श</button>
-                    <button type="button" class="key">ष</button>
-                    <button type="button" class="key">ह</button>
-                    <button type="button" class="key">क्ष</button>
-                    <button type="button" class="key">त्र</button>
-                    <button type="button" class="key">ज्ञ</button>
-                    <button type="button" class="key">ं</button>
-                    <button type="button" class="key">ः</button>
-                    <button type="button" class="key">ँ</button>
-                    <button type="button" class="key">्</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key">ा</button>
-                    <button type="button" class="key">ि</button>
-                    <button type="button" class="key">ी</button>
-                    <button type="button" class="key">ु</button>
-                    <button type="button" class="key">ू</button>
-                    <button type="button" class="key">े</button>
-                    <button type="button" class="key">ै</button>
-                    <button type="button" class="key">ो</button>
-                    <button type="button" class="key">ौ</button>
-                    <button type="button" class="key" data-key="backspace">⌫</button>
-                  </div>
-                  <div class="keyboard-row">
-                    <button type="button" class="key key-space" data-key="space">Space</button>
-                    <button type="button" class="key">।</button>
-                    <button type="button" class="key">०</button>
-                    <button type="button" class="key">१</button>
-                    <button type="button" class="key">२</button>
-                    <button type="button" class="key">३</button>
-                    <button type="button" class="key">४</button>
-                    <button type="button" class="key">५</button>
-                  </div>
-                </div>
 
                 <div class="step-nav-row">
                   <button class="btn-primary" type="button" id="back-to-segmentation-btn">← Previous Step</button>
@@ -629,8 +546,131 @@
     let docStatus = "{% if selected_doc %}{{ selected_doc.status }}{% endif %}";
   </script>
 
+<div id="nepali-keyboard" class="nepali-keyboard" style="display:none;">
+  <div class="keyboard-drag-handle">⠿</div>
+  <div class="keyboard-grid">
+
+    <!-- Vowels (14) → 2 rows of 7 -->
+    <button type="button" class="key">अ</button>
+    <button type="button" class="key">आ</button>
+    <button type="button" class="key">इ</button>
+    <button type="button" class="key">ई</button>
+    <button type="button" class="key">उ</button>
+    <button type="button" class="key">ऊ</button>
+    <button type="button" class="key">ऋ</button>
+    <button type="button" class="key">ए</button>
+    <button type="button" class="key">ऐ</button>
+    <button type="button" class="key">ओ</button>
+    <button type="button" class="key">औ</button>
+    <button type="button" class="key">अं</button>
+    <button type="button" class="key">अः</button>
+    <button type="button" class="key">अँ</button>
+
+    <!-- Divider -->
+    <div class="key-divider"></div>
+
+    <!-- Consonants ka–ma (25) → rows of 7, 7, 7, 4 -->
+    <button type="button" class="key">क</button>
+    <button type="button" class="key">ख</button>
+    <button type="button" class="key">ग</button>
+    <button type="button" class="key">घ</button>
+    <button type="button" class="key">ङ</button>
+    <button type="button" class="key">च</button>
+    <button type="button" class="key">छ</button>
+    <button type="button" class="key">ज</button>
+    <button type="button" class="key">झ</button>
+    <button type="button" class="key">ञ</button>
+    <button type="button" class="key">ट</button>
+    <button type="button" class="key">ठ</button>
+    <button type="button" class="key">ड</button>
+    <button type="button" class="key">ढ</button>
+    <button type="button" class="key">ण</button>
+    <button type="button" class="key">त</button>
+    <button type="button" class="key">थ</button>
+    <button type="button" class="key">द</button>
+    <button type="button" class="key">ध</button>
+    <button type="button" class="key">न</button>
+    <button type="button" class="key">प</button>
+    <button type="button" class="key">फ</button>
+    <button type="button" class="key">ब</button>
+    <button type="button" class="key">भ</button>
+    <button type="button" class="key">म</button>
+    <button type="button" class="key">य</button>
+    <button type="button" class="key">र</button>
+    <button type="button" class="key">ल</button>
+    <button type="button" class="key">व</button>
+    <button type="button" class="key">श</button>
+    <button type="button" class="key">ष</button>
+    <button type="button" class="key">स</button>
+    <button type="button" class="key">ह</button>
+    <button type="button" class="key">क्ष</button>
+    <button type="button" class="key">त्र</button>
+    <button type="button" class="key">ज्ञ</button>
+
+    <!-- Divider -->
+    <div class="key-divider"></div>
+
+    <!-- Matras (10) → 1 row of 7 + 3 -->
+    <div class="key-row-fluid">
+      <button type="button" class="key">ा</button>
+      <button type="button" class="key">ि</button>
+      <button type="button" class="key">ी</button>
+      <button type="button" class="key">ु</button>
+      <button type="button" class="key">ू</button>
+      <button type="button" class="key">े</button>
+      <button type="button" class="key">ै</button>
+      <button type="button" class="key">ो</button>
+      <button type="button" class="key">ौ</button>
+      <button type="button" class="key">्</button>
+      <button type="button" class="key">ृ</button>
+      <button type="button" class="key">ं</button>
+      <button type="button" class="key">ँ</button>
+      <button type="button" class="key">़</button>
+    </div>
+
+    <!-- Divider -->
+    <div class="key-divider"></div>
+
+    <!-- Diacritics + punctuation (7) → 1 row -->
+    <!-- <button type="button" class="key">ं</button> -->
+    <button type="button" class="key">ः</button>
+    <!-- <button type="button" class="key">ँ</button> -->
+    
+    <button type="button" class="key">।</button>
+    <button type="button" class="key">॥</button>
+    <button type="button" class="key">ऽ</button>
+
+    <!-- Divider -->
+    <div class="key-divider"></div>
+
+   
+    <button type="button" class="key">०</button>
+    <button type="button" class="key">१</button>
+    <button type="button" class="key">२</button>
+    <button type="button" class="key">३</button>
+    <button type="button" class="key">४</button>
+    <button type="button" class="key">५</button>
+    <button type="button" class="key">६</button>
+    <button type="button" class="key">७</button>
+    <button type="button" class="key">८</button>
+    <button type="button" class="key">९</button>
+
+    <div class="key-divider"></div>
+    <!-- Backspace + Space -->
+    <div class="key-row-fluid">
+      <button type="button" class="key key-backspace" data-key="backspace">⌫</button>
+      <button type="button" class="key key-space" data-key="space">Space</button>
+    </div>
+
+
+  </div>
+</div>
+
 
   <script src="{% static 'htr/js/workspace.js' %}"></script>
 
+
+
+  
 </body>
 </html>
