@@ -1530,18 +1530,19 @@ mark.dict-highlight {
 
 
 .matched-word-chip {
-  position: relative;
   font-size: 11px;
   font-family: var(--serif);
   color: var(--success);
   background: var(--success-soft);
   border: 1px solid rgba(76, 122, 82, 0.2);
   border-radius: 4px;
-  padding: 1px 6px;
-  cursor: default;
+  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.matched-word-chip::after {
+/* .matched-word-chip::after {
   content: attr(data-lemma);
   position: absolute;
   bottom: calc(100% + 4px);
@@ -1558,8 +1559,14 @@ mark.dict-highlight {
   opacity: 0;
   transition: opacity 0.15s;
   z-index: 99999;
+} */
+
+.chip-lemma {
+  color: var(--ink);
+  font-size: 10px;
 }
 
-.matched-word-chip:hover::after {
-  opacity: 1;
+/* remove the ::after tooltip since we no longer need it */
+.matched-word-chip::after {
+  display: none;
 }

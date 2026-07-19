@@ -1808,27 +1808,42 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
     wordsPopup.innerHTML = '';
     const label = document.createElement('span');
     label.className = 'matched-words-label';
-    label.textContent = 'Matched words:';
+    label.textContent = 'Matched words (word → lemma):';
     wordsPopup.appendChild(label);
     words.forEach(item => {
       const chip = document.createElement('span');
       chip.className = 'matched-word-chip';
       const word = typeof item === 'string' ? item : item.word;
       const lemma = typeof item === 'object' ? item.lemma : null;
-      chip.textContent = word;
-      if (lemma && lemma !== word) {
-        chip.dataset.lemma = `→ ${lemma}`;  // ← data-lemma not title
+      
+      if (lemma) {
+        chip.innerHTML = `${word} <span class="chip-lemma">→ ${lemma}</span>`;
+      } else {
+        chip.textContent = word;
       }
       wordsPopup.appendChild(chip);
     });
 
-    
+
     highlightWordsInLine(row, words);
     const btnRect = dictBtn.getBoundingClientRect();
-    const popupWidth = 280;
     wordsPopup.style.display = 'flex';
-    wordsPopup.style.left = Math.min(btnRect.left, window.innerWidth - popupWidth - 8) + 'px';
-    wordsPopup.style.top = (btnRect.top - wordsPopup.offsetHeight - 8) + 'px';
+    
+    const popupWidth = wordsPopup.offsetWidth || 300;
+    const popupHeight = wordsPopup.offsetHeight || 100;
+    
+    let left = btnRect.left;
+    if (left + popupWidth > window.innerWidth - 8) {
+      left = window.innerWidth - popupWidth - 8;
+    }
+    if (left < 8) left = 8;
+    
+    let top = btnRect.top - popupHeight - 8;
+    if (top < 8) top = btnRect.bottom + 8;
+    
+    wordsPopup.style.left = left + 'px';
+    wordsPopup.style.top = top + 'px';
+    
     wordsPopup.dataset.activeRow = row.dataset.lineIndex;
     return;
   }
