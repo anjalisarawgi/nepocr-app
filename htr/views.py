@@ -29,6 +29,9 @@ import numpy as np
 from kraken.lib import segmentation as kraken_segmentation
 import json
 from PIL import ImageDraw
+import pickle
+import regex as re_regex  # rename to avoid clashing with stdlib `re` already imported above
+
 
 
 KRAKEN_MODEL_PATH =  '/Users/anjalisarawgi/anaconda3/envs/gnn_hre/lib/python3.8/site-packages/kraken/blla.mlmodel'
@@ -53,6 +56,51 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
+
+from .utils.trie import load_trie, TrieNode
+import regex as re_regex
+
+@lru_cache(maxsize=1)
+def load_trie_cached():
+    trie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lemma_trie.json')
+    return load_trie(trie_path)
+
+def get_graphemes(text):
+    return re_regex.findall(r'\X', text)
+
+def greedy_match_line(trie_root, text, min_len=2, max_len=30):
+    graphemes = get_graphemes(text)
+    i = 0
+    matches = []
+    while i < len(graphemes):
+        node = trie_root
+        longest = None
+        for j in range(i, min(len(graphemes), i + max_len)):
+            g = graphemes[j]
+            for ch in g:
+                if ch not in node.children:
+                    node = None
+                    break
+                node = node.children[ch]
+            if node is None:
+                break
+            if node.entries and (j + 1 - i) >= min_len:
+                longest = (i, j + 1)
+        if longest:
+            matches.append(longest)
+            i = longest[1]
+        else:
+            i += 1
+    char_offsets = [0]
+    for g in graphemes:
+        char_offsets.append(char_offsets[-1] + len(g))
+    return [(char_offsets[i], char_offsets[j]) for i, j in matches]
+
+def get_matched_words(trie, text, min_len=2):
+    spans = greedy_match_line(trie, text, min_len=min_len)
+    words = [text[s:e] for s, e in spans]
+    return sorted(set(words), key=lambda w: len(w), reverse=True)
 
 
 
@@ -433,6 +481,7 @@ def predict_line_with_confidence(pil_crop, topk=3):
 @login_required
 def run_ocr(request, pk):
     if request.method == 'POST':
+        trie = load_trie_cached()
         image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
 
         source_field = image.processed if image.processed else image.locked_image
@@ -500,7 +549,10 @@ def run_ocr(request, pk):
             crop = seg_img.crop(crop_box)
 
             text, html = predict_line_with_confidence(crop)
-            predictions.append({'line_index': original_idx, 'text': text, 'html': html})
+            matched_words = get_matched_words(trie, text, min_len=2)
+            print(f"Line: {text[:30]}... → matches: {matched_words}")
+
+            predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'matched_words': matched_words, })
             
         image.ocr_predictions = predictions
         image.ocr_stale = False
@@ -603,3 +655,7 @@ def edit_ocr(request, pk):
 
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
+
+
+

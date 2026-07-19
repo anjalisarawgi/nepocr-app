@@ -458,7 +458,10 @@
               
                 <div class="ocr-results-panel" id="ocr-results-panel" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
                   <div class="ocr-results-header">
-                    <span class="ocr-results-title">Transcription</span>
+                    <span class="ocr-results-title">Model Transcription</span>
+                    <!-- <button type="button" id="toggle-matched-words-btn" class="overlay-toggle" style="font-size:11.5px; background:none; border:none; cursor:pointer; color:var(--ink-soft);">
+                      Show matched words
+                    </button> -->
                     <label class="overlay-toggle" id="confidence-toggle-row">
                       <input type="checkbox" id="show-confidence-checkbox">
                       <span>Show model confidence</span>

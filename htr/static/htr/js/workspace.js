@@ -648,6 +648,7 @@ function captureBasePolygons() {
   selectedIndices.forEach((idx) => {
     if (segmentationLines[idx]) {
       if (!originalPolygons[idx]) {
+        // only capture original if we haven't seen this line before
         originalPolygons[idx] = segmentationLines[idx].polygon.map(p => [p[0], p[1]]);
       }
       basePolygons[idx] = originalPolygons[idx].map(p => [p[0], p[1]]);
@@ -848,17 +849,25 @@ function renderOverlay() {
       if (!isReadOnlyOverlay) {
         polygon.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (didDrag) return; // if the user was dragging and not clicking - pls ignore
-          if (isEditingOcr) return;  // 
-          if (e.metaKey || e.ctrlKey) { // cntrl + click -- add / remove from selection 
+          if (didDrag) return;
+          if (isEditingOcr) return;
+          if (isDrawingBaseline) return;
+        
+          if (e.metaKey || e.ctrlKey) {
             if (selectedIndices.has(index)) {
               selectedIndices.delete(index);
+              delete originalPolygons[index]; // ← clear when deselecting
             } else {
               selectedIndices.add(index);
             }
           } else {
-            selectedIndices = new Set([index]); // normal click -- select only this one 
+            // clear originals for any previously selected lines that are no longer selected
+            selectedIndices.forEach(i => {
+              if (i !== index) delete originalPolygons[i]; // ← clear old ones
+            });
+            selectedIndices = new Set([index]);
           }
+        
           if (paddingTop) {
             const saved = linePaddingValues[index] || { top: 0, bottom: 0, left: 0, right: 0 };
             paddingTop.value = saved.top;
@@ -867,7 +876,7 @@ function renderOverlay() {
             paddingRight.value = saved.right;
             captureBasePolygons();
           }
-          renderOverlay(); // just redraw the updated
+          renderOverlay();
         });
       } else {
         // in OCR mode -- the clikcing highlights the ocr results instead
@@ -1089,6 +1098,8 @@ function deselectIfEmpty(e) {
   if (isDrawingBaseline) return;
   if (selectedIndices.size === 0) return;
   selectedIndices = new Set();
+  originalPolygons = {};
+  linePaddingValues = {}; // ← add this
   if (paddingTop) {
     paddingTop.value = 0;
     paddingBottom.value = 0;
@@ -1098,6 +1109,7 @@ function deselectIfEmpty(e) {
   document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
   renderOverlay();
 }
+
 
 previewImage.addEventListener('click', deselectIfEmpty);
 document.getElementById('line-overlay').addEventListener('click', deselectIfEmpty);
@@ -1200,18 +1212,30 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           const row = document.createElement('div');
           row.className = 'ocr-line-result';
           row.dataset.lineIndex = pred.line_index;
-
+        
           const numberSpan = document.createElement('span');
           numberSpan.className = 'ocr-line-number';
           numberSpan.textContent = i + 1;
-
+        
           const textSpan = document.createElement('span');
           textSpan.className = 'ocr-line-text';
           textSpan.dataset.html = pred.html;
           textSpan.dataset.plain = pred.text;
           textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
-
-          // ADD the edit button
+        
+          // matched words chips
+          const wordsDiv = document.createElement('div');
+          wordsDiv.className = 'matched-words';
+          
+          if (pred.matched_words && pred.matched_words.length > 0) {
+            pred.matched_words.forEach(word => {
+              const chip = document.createElement('span');
+              chip.className = 'matched-word-chip';
+              chip.textContent = word;
+              wordsDiv.appendChild(chip);
+            });
+          }
+        
           const editBtn = document.createElement('button');
           editBtn.type = 'button';
           editBtn.className = 'ocr-line-edit-btn';
@@ -1223,15 +1247,16 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
             </svg>
             <svg class="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
               <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          `;
-
+            </svg>`;
+        
           row.appendChild(numberSpan);
           row.appendChild(textSpan);
-          row.appendChild(editBtn); // ← this was missing
+          row.appendChild(wordsDiv);  // ← add words below text
+          row.appendChild(editBtn);
           resultsDiv.appendChild(row);
         });
 
+        
         document.getElementById('ocr-results-panel').style.display = 'flex';
         document.getElementById('ocr-stale-warning').style.display = 'none';
       }
@@ -1389,8 +1414,18 @@ function exitDrawMode() {
   drawBaselineBtn.style.display = 'inline-block';
   lineOverlay.style.cursor = 'default';
   lineOverlay.style.pointerEvents = 'none';
+  originalPolygons = {};
+  linePaddingValues = {}; // ← add this
+  selectedIndices = new Set();
+  if (paddingTop) {
+    paddingTop.value = 0;
+    paddingBottom.value = 0;
+    paddingLeft.value = 0;
+    paddingRight.value = 0;
+  }
   renderOverlay();
 }
+
 
 cancelBaselineBtn.addEventListener('click', exitDrawMode);
 
@@ -1411,7 +1446,9 @@ finishBaselineBtn.addEventListener('click', () => {
     .then((data) => {
       if (data.success) {
         pushHistory();
+        const newIndex = segmentationLines.length;
         segmentationLines.push({ polygon: data.polygon, baseline: data.baseline });
+        linePaddingValues[newIndex] = { top: 0, bottom: 0, left: 0, right: 0 }; // ← explicit zero
         exitDrawMode();
         autoSaveSegmentation();
         document.getElementById('advance-to-ocr-btn').disabled = segmentationLines.length === 0;   // 👈 add this line
