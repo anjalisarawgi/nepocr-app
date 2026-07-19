@@ -597,13 +597,9 @@ def edit_ocr(request, pk):
         for pred in predictions:
             if pred['line_index'] in updated_map:
                 pred['text'] = updated_map[pred['line_index']]
-                pred['html'] = pred['text']
 
         image.ocr_predictions = predictions
         image.save()
-
-        image.refresh_from_db()
-        # print("=== AFTER SAVE+RELOAD ===", image.ocr_predictions)
 
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})

@@ -1197,34 +1197,49 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
         const resultsDiv = document.getElementById('ocr-results');
         resultsDiv.innerHTML = '';
         data.predictions.forEach((pred, i) => {
-          const row = document.createElement('div'); // create a row
+          const row = document.createElement('div');
           row.className = 'ocr-line-result';
-          row.dataset.lineIndex = pred.line_index; // link to polygon
-          const textSpan = document.createElement('span');  // create text
-          textSpan.className = 'ocr-line-text';
-          textSpan.dataset.html = pred.html; // stored coloured version
-          textSpan.dataset.plain = pred.text; // store plain version
-          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text; 
-    
-          const numberSpan = document.createElement('span'); // creating line number
-          numberSpan.className = 'ocr-line-number'; // 1,2,3
+          row.dataset.lineIndex = pred.line_index;
+
+          const numberSpan = document.createElement('span');
+          numberSpan.className = 'ocr-line-number';
           numberSpan.textContent = i + 1;
-    
-          row.appendChild(numberSpan); // add number to the rows
-          row.appendChild(textSpan); // displaying text to the rows 
+
+          const textSpan = document.createElement('span');
+          textSpan.className = 'ocr-line-text';
+          textSpan.dataset.html = pred.html;
+          textSpan.dataset.plain = pred.text;
+          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
+
+          // ADD the edit button
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.className = 'ocr-line-edit-btn';
+          editBtn.title = 'Edit this line';
+          editBtn.innerHTML = `
+            <svg class="icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <svg class="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          `;
+
+          row.appendChild(numberSpan);
+          row.appendChild(textSpan);
+          row.appendChild(editBtn); // ← this was missing
           resultsDiv.appendChild(row);
         });
-        document.getElementById('ocr-results-panel').style.display = 'flex'; 
-        document.getElementById('ocr-stale-warning').style.display = 'none';
 
+        document.getElementById('ocr-results-panel').style.display = 'flex';
+        document.getElementById('ocr-stale-warning').style.display = 'none';
       }
     })
     .finally(() => {
       document.getElementById('processing-overlay').style.display = 'none';
     });
 });
-
-
 
 // back button
 document.getElementById('back-to-segmentation-btn').addEventListener('click', () => {
@@ -1628,8 +1643,15 @@ function saveOcrEdits() {
     const lineIndex = parseInt(row.dataset.lineIndex);
     const textSpan = row.querySelector('.ocr-line-text');
     const newText = textSpan.innerText.trim();
+    
+    // only update plain text, leave data-html (confidence) intact
+    textSpan.dataset.plain = newText;
+    
     updatedPredictions.push({ line_index: lineIndex, text: newText });
   });
+
+  // re-apply confidence visibility based on current checkbox state
+  applyConfidenceVisibility();
 
   fetch(`/edit-ocr/${currentDocId}/`, {
     method: 'POST',
@@ -1641,6 +1663,7 @@ function saveOcrEdits() {
       if (data.success) console.log('OCR edits saved');
     });
 }
+
 
 function startEditingLine(lineIndex) {
   isEditingOcr = true;
@@ -1710,29 +1733,32 @@ function positionKeyboardBelowLine(row) {
 
 
 
-
 function stopEditingLine() {
   isEditingOcr = false;
   editingLineIndex = null;
 
-  document.querySelectorAll('.ocr-line-text').forEach((el) => { el.contentEditable = false; });
+  document.querySelectorAll('.ocr-line-text').forEach((el) => { 
+    el.contentEditable = false;
+  });
   document.querySelectorAll('.ocr-line-result').forEach((r) => { r.classList.remove('editing-row'); });
   document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => { btn.classList.remove('is-saving'); });
-  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove()); // clean up
+  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove());
 
   document.getElementById('ocr-results').classList.remove('locked-editing');
   nepaliKeyboard.style.display = 'none';
 
-  // reset position for next time
   nepaliKeyboard.style.top = 'auto';
   nepaliKeyboard.style.left = 'auto';
-  nepaliKeyboard.style.bottom = '24px';
-  nepaliKeyboard.style.right = '24px';
+  nepaliKeyboard.style.bottom = '16px';
+  nepaliKeyboard.style.right = '';
 
   activeEditableEl = null;
 
-  saveOcrEdits();
+  saveOcrEdits(); // this now calls applyConfidenceVisibility() at the end
 }
+
+
+
 
 document.getElementById('ocr-results').addEventListener('click', (e) => {
   const editBtn = e.target.closest('.ocr-line-edit-btn');
