@@ -1148,9 +1148,14 @@ function setupOcrHoverHighlight() {
     const row = e.target.closest('.ocr-line-result');
     if (!row) return;
     const lineIndex = parseInt(row.dataset.lineIndex);
-    hoveredLineIndex = null;        // ← add this
+    hoveredLineIndex = null;
     selectedIndices = new Set([lineIndex]);
-    renderOverlay();                // only one renderOverlay call now
+  
+    // highlight the clicked row
+    resultsDiv.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
+    row.classList.add('selected');
+  
+    renderOverlay();
   });
 }
 

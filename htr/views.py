@@ -583,22 +583,27 @@ def download_ocr_text(request, pk):
     return response
 
 
+
 @login_required
 def edit_ocr(request, pk):
     if request.method == 'POST':
         image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
         data = json.loads(request.body)
         updated = data.get('predictions', [])
-
         predictions = image.ocr_predictions or []
+        
         updated_map = {p['line_index']: p['text'] for p in updated}
 
         for pred in predictions:
             if pred['line_index'] in updated_map:
                 pred['text'] = updated_map[pred['line_index']]
-                pred['html'] = pred['text']  # simple version — no confidence colours after edit
+                pred['html'] = pred['text']
 
         image.ocr_predictions = predictions
         image.save()
+
+        image.refresh_from_db()
+        # print("=== AFTER SAVE+RELOAD ===", image.ocr_predictions)
+
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
