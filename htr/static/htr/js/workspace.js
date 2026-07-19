@@ -1140,39 +1140,21 @@ function setupOcrHoverHighlight() {
   const resultsDiv = document.getElementById('ocr-results');
   if (!resultsDiv) return;
 
-  // hover over result -- highlight polygon
   resultsDiv.addEventListener('mouseover', (e) => {
-    if (isEditingOcr) return;   
+    if (isEditingOcr) return;
     const row = e.target.closest('.ocr-line-result');
     if (!row) return;
     hoveredLineIndex = parseInt(row.dataset.lineIndex);
     renderOverlay();
   });
 
-  // mouse leaves results -- unhighlight polygon
   resultsDiv.addEventListener('mouseout', (e) => {
     const row = e.target.closest('.ocr-line-result');
     if (!row) return;
     hoveredLineIndex = null;
     renderOverlay();
   });
-
-  // click result row maching polygon
-  resultsDiv.addEventListener('click', (e) => {
-    if (e.target.closest('.ocr-line-edit-btn')) return;  
-    if (isEditingOcr) return; 
-    const row = e.target.closest('.ocr-line-result');
-    if (!row) return;
-    const lineIndex = parseInt(row.dataset.lineIndex);
-    hoveredLineIndex = null;
-    selectedIndices = new Set([lineIndex]);
-  
-    // highlight the clicked row
-    resultsDiv.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
-    row.classList.add('selected');
-  
-    renderOverlay();
-  });
+  // no click listener here anymore
 }
 
 setupOcrHoverHighlight();
@@ -1224,16 +1206,20 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
         
           // matched words chips
-          const wordsDiv = document.createElement('div');
-          wordsDiv.className = 'matched-words';
+          row.dataset.matchedWords = JSON.stringify(pred.matched_words || []);
+
+          const dictBtn = document.createElement('button');
+          dictBtn.type = 'button';
+          dictBtn.className = 'ocr-line-dict-btn';
+          dictBtn.title = 'Show matched words';
+          dictBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>`;
           
-          if (pred.matched_words && pred.matched_words.length > 0) {
-            pred.matched_words.forEach(word => {
-              const chip = document.createElement('span');
-              chip.className = 'matched-word-chip';
-              chip.textContent = word;
-              wordsDiv.appendChild(chip);
-            });
+          if (!pred.matched_words || pred.matched_words.length === 0) {
+            dictBtn.style.display = 'none';
           }
         
           const editBtn = document.createElement('button');
@@ -1251,7 +1237,7 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
         
           row.appendChild(numberSpan);
           row.appendChild(textSpan);
-          row.appendChild(wordsDiv);  // ← add words below text
+          row.appendChild(dictBtn); 
           row.appendChild(editBtn);
           resultsDiv.appendChild(row);
         });
@@ -1672,6 +1658,12 @@ let editingLineIndex = null;
 const nepaliKeyboard = document.getElementById('nepali-keyboard');
 let activeEditableEl = null;
 
+const wordsPopup = document.createElement('div');
+wordsPopup.id = 'matched-words-popup';
+wordsPopup.className = 'matched-words-popup';
+wordsPopup.style.display = 'none';
+document.body.appendChild(wordsPopup)
+
 function saveOcrEdits() {
   const rows = document.querySelectorAll('.ocr-line-result');
   const updatedPredictions = [];
@@ -1796,21 +1788,110 @@ function stopEditingLine() {
 
 
 
-
 document.getElementById('ocr-results').addEventListener('click', (e) => {
+
+  // 1. dict button
+  const dictBtn = e.target.closest('.ocr-line-dict-btn');
+  if (dictBtn) {
+    e.stopPropagation();
+    const row = dictBtn.closest('.ocr-line-result');
+    const words = JSON.parse(row.dataset.matchedWords || '[]');
+    if (words.length === 0) return;
+
+    if (wordsPopup.dataset.activeRow === row.dataset.lineIndex && wordsPopup.style.display !== 'none') {
+      wordsPopup.style.display = 'none';
+      restoreLineText(row);
+      return;
+    }
+
+    document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
+    wordsPopup.innerHTML = '';
+    const label = document.createElement('span');
+    label.className = 'matched-words-label';
+    label.textContent = 'Matched words:';
+    wordsPopup.appendChild(label);
+    words.forEach(item => {
+      const chip = document.createElement('span');
+      chip.className = 'matched-word-chip';
+      const word = typeof item === 'string' ? item : item.word;
+      const lemma = typeof item === 'object' ? item.lemma : null;
+      chip.textContent = word;
+      if (lemma && lemma !== word) {
+        chip.dataset.lemma = `→ ${lemma}`;  // ← data-lemma not title
+      }
+      wordsPopup.appendChild(chip);
+    });
+
+    
+    highlightWordsInLine(row, words);
+    const btnRect = dictBtn.getBoundingClientRect();
+    const popupWidth = 280;
+    wordsPopup.style.display = 'flex';
+    wordsPopup.style.left = Math.min(btnRect.left, window.innerWidth - popupWidth - 8) + 'px';
+    wordsPopup.style.top = (btnRect.top - wordsPopup.offsetHeight - 8) + 'px';
+    wordsPopup.dataset.activeRow = row.dataset.lineIndex;
+    return;
+  }
+
+  // 2. edit button
   const editBtn = e.target.closest('.ocr-line-edit-btn');
-  if (!editBtn) return;
-  e.stopPropagation();
+  if (editBtn) {
+    e.stopPropagation();
+    const row = editBtn.closest('.ocr-line-result');
+    const lineIndex = parseInt(row.dataset.lineIndex);
+    if (isEditingOcr && editingLineIndex === lineIndex) {
+      stopEditingLine();
+    } else if (!isEditingOcr) {
+      startEditingLine(lineIndex);
+    }
+    return;
+  }
 
-  const row = editBtn.closest('.ocr-line-result');
+  // 3. row click (select polygon)
+  if (isEditingOcr) return;
+  const row = e.target.closest('.ocr-line-result');
+  if (!row) return;
   const lineIndex = parseInt(row.dataset.lineIndex);
+  hoveredLineIndex = null;
+  selectedIndices = new Set([lineIndex]);
+  document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
+  row.classList.add('selected');
+  renderOverlay();
+});
 
-  if (isEditingOcr && editingLineIndex === lineIndex) {
-    stopEditingLine();       // clicking the checkmark on the active line → save
-  } else if (!isEditingOcr) {
-    startEditingLine(lineIndex);   // clicking pencil on a line → start editing
+// close popup when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
+    wordsPopup.style.display = 'none';
+    document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
   }
 });
+
+function highlightWordsInLine(row, words) {
+  const textSpan = row.querySelector('.ocr-line-text');
+  if (!textSpan) return;
+  const plain = textSpan.dataset.plain || textSpan.innerText;
+  textSpan.dataset.beforeHighlight = plain;
+
+  // handle both [{word, lemma}] and ['word'] formats
+  const wordStrings = words.map(w => typeof w === 'string' ? w : w.word);
+  const escaped = wordStrings.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
+  const highlighted = plain.replace(pattern, `<mark class="dict-highlight">$1</mark>`);
+  textSpan.innerHTML = highlighted;
+}
+
+
+
+function restoreLineText(row) {
+  const textSpan = row.querySelector('.ocr-line-text');
+  if (!textSpan || !textSpan.dataset.beforeHighlight) return;
+  const showConfidence = confidenceCheckbox.checked;
+  textSpan.innerHTML = showConfidence ? textSpan.dataset.html : textSpan.dataset.plain;
+  delete textSpan.dataset.beforeHighlight;
+}
+
+
 
 document.getElementById('ocr-results').addEventListener('focusin', (e) => {
   if (e.target.classList.contains('ocr-line-text')) {
@@ -1897,3 +1978,20 @@ document.querySelector('.right-col').addEventListener('scroll', () => {
     positionKeyboardBelowLine(document.querySelector('.ocr-line-result.editing-row'));
   }
 });
+
+
+
+// // matched words popup
+// const wordsPopup = document.createElement('div');
+// wordsPopup.id = 'matched-words-popup';
+// wordsPopup.className = 'matched-words-popup';
+// wordsPopup.style.display = 'none';
+// document.body.appendChild(wordsPopup);
+
+
+// // close popup when clicking outside
+// document.addEventListener('click', (e) => {
+//   if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
+//     wordsPopup.style.display = 'none';
+//   }
+// });

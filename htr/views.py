@@ -97,11 +97,24 @@ def greedy_match_line(trie_root, text, min_len=2, max_len=30):
         char_offsets.append(char_offsets[-1] + len(g))
     return [(char_offsets[i], char_offsets[j]) for i, j in matches]
 
-def get_matched_words(trie, text, min_len=2):
+def get_matched_words(trie, text, min_len=3):
     spans = greedy_match_line(trie, text, min_len=min_len)
-    words = [text[s:e] for s, e in spans]
-    return sorted(set(words), key=lambda w: len(w), reverse=True)
-
+    seen = set()
+    results = []
+    for s, e in spans:
+        word = text[s:e]
+        if word not in seen:
+            seen.add(word)
+            # walk trie to get lemma
+            node = trie
+            for ch in word:
+                if ch not in node.children:
+                    node = None
+                    break
+                node = node.children[ch]
+            lemma = node.entries[0]['lemma'] if node and node.entries else word
+            results.append({'word': word, 'lemma': lemma})
+    return results
 
 
 @login_required
@@ -124,6 +137,12 @@ def upload_image(request, pk = None):
     if pk:
         selected_doc = get_object_or_404(UploadedImage, pk=pk, user=request.user) # get_object_or_404 = go to the database, find the document with that id, belonging to this user, if it does not exist, show a 404 error page
 
+    if selected_doc and selected_doc.ocr_predictions:
+        for pred in selected_doc.ocr_predictions:
+            if 'matched_words_json' not in pred:
+                pred['matched_words_json'] = json.dumps(
+                    pred.get('matched_words', []), ensure_ascii=False
+                )
     return render(request, 'htr/main_page.html', {'form': form, 'documents': documents, 'selected_doc': selected_doc}) # page 1  = upload page  # 
 
 
@@ -552,7 +571,7 @@ def run_ocr(request, pk):
             matched_words = get_matched_words(trie, text, min_len=2)
             print(f"Line: {text[:30]}... → matches: {matched_words}")
 
-            predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'matched_words': matched_words, })
+            predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'matched_words': matched_words, 'matched_words_json': json.dumps(matched_words, ensure_ascii=False), })
             
         image.ocr_predictions = predictions
         image.ocr_stale = False
@@ -655,6 +674,7 @@ def edit_ocr(request, pk):
 
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
+
 
 
 

@@ -1473,3 +1473,93 @@ nav {
   border-radius: 4px;
   padding: 1px 6px;
 }
+
+
+.ocr-line-dict-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--success);
+  flex: 0 0 auto;
+}
+.ocr-line-dict-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.ocr-line-dict-btn:hover {
+  color: var(--ink);
+}
+.ocr-line-result:hover .ocr-line-dict-btn,
+.ocr-line-result.selected .ocr-line-dict-btn {
+  display: flex;
+}
+
+.matched-words-popup {
+  position: fixed;
+  z-index: 999;
+  background: white;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  max-width: 320px;
+}
+
+.matched-words-label {
+  font-size: 11px;
+  color: var(--ink-faint);
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+mark.dict-highlight {
+  background: rgba(76, 122, 82, 0.25);
+  color: var(--success);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
+}
+
+
+.matched-word-chip {
+  position: relative;
+  font-size: 11px;
+  font-family: var(--serif);
+  color: var(--success);
+  background: var(--success-soft);
+  border: 1px solid rgba(76, 122, 82, 0.2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: default;
+}
+
+.matched-word-chip::after {
+  content: attr(data-lemma);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  font-size: 11px;
+  font-family: var(--serif);
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 99999;
+}
+
+.matched-word-chip:hover::after {
+  opacity: 1;
+}
