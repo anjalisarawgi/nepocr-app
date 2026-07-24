@@ -144,3 +144,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media') # the url path Django will use to a
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'

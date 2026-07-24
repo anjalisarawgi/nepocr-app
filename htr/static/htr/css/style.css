@@ -1464,15 +1464,6 @@ nav {
   padding-bottom: 4px;
 }
 
-.matched-word-chip {
-  font-size: 11px;
-  font-family: var(--serif);
-  color: var(--success);
-  background: var(--success-soft);
-  border: 1px solid rgba(76, 122, 82, 0.2);
-  border-radius: 4px;
-  padding: 1px 6px;
-}
 
 
 .ocr-line-dict-btn {
@@ -1500,25 +1491,28 @@ nav {
 
 .matched-words-popup {
   position: fixed;
-  z-index: 999;
+  z-index: 99999;
   background: white;
   border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  padding: 8px 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
+  gap: 8px;
   max-width: 320px;
+  flex-wrap: wrap;  /* so chips wrap to next line if many */
+  flex-direction: row;
+  align-items: flex-start;
 }
 
 .matched-words-label {
   font-size: 11px;
+  font-weight: 600;
   color: var(--ink-faint);
-  width: 100%;
-  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
+
 
 mark.dict-highlight {
   background: rgba(76, 122, 82, 0.25);
@@ -1528,45 +1522,32 @@ mark.dict-highlight {
   font-weight: 600;
 }
 
+.dict-highlight {
+  background: rgba(76, 122, 82, 0.15);
+  color: var(--success);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 600;
+}
 
 .matched-word-chip {
-  font-size: 11px;
-  font-family: var(--serif);
-  color: var(--success);
-  background: var(--success-soft);
-  border: 1px solid rgba(76, 122, 82, 0.2);
-  border-radius: 4px;
-  padding: 2px 7px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  background: var(--success-soft);
+  border: 1px solid var(--success);
+  color: var(--success);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-family: var(--serif);
 }
 
-/* .matched-word-chip::after {
-  content: attr(data-lemma);
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
-  color: white;
-  font-size: 11px;
-  font-family: var(--serif);
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 99999;
-} */
 
 .chip-lemma {
-  color: var(--ink);
-  font-size: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
 }
-
-/* remove the ::after tooltip since we no longer need it */
 .matched-word-chip::after {
   display: none;
 }

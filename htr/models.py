@@ -18,7 +18,7 @@ class UploadedImage(models.Model):
         ("ocr_done", "OCR Complete")
     ]
 
-    user = models.ForeignKey(User, on_delete = models.CASCADE, null=True, blank=True) # this field will link the uploaded image to the user who uploaded it, and if the user is deleted, the image will also be deleted
+    user = models.ForeignKey(User, on_delete = models.CASCADE) # this field will link the uploaded image to the user who uploaded it, and if the user is deleted, the image will also be deleted
     original_image = models.ImageField(upload_to=user_upload_path) # file path of the image the user uploads
     processed = models.ImageField(upload_to = "processed/", blank = True, null = True) # this field will store the file path of the image after preprocessing
     uploaded_at = models.DateTimeField(auto_now_add=True) # timestamp of when the image was uploaded
