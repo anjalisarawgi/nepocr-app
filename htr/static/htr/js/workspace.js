@@ -913,7 +913,7 @@ function renderOverlay() {
     
       if (showPolygons) {
       segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
-        const size = 22 * scale;
+        const size = 18 * scale;
         const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         square.setAttribute('x', point[0] - size / 2);
         square.setAttribute('y', point[1] - size / 2);
@@ -921,7 +921,7 @@ function renderOverlay() {
         square.setAttribute('height', size);
         square.setAttribute('fill', 'rgba(255,255,255,0.85)');
         square.setAttribute('stroke', '#1E3A5F');
-        square.setAttribute('stroke-width', 2 * scale);
+        square.setAttribute('stroke-width', 3 * scale);
         square.classList.add('overlay-handle');
         square.style.transformOrigin = `${point[0]}px ${point[1]}px`;
         square.style.pointerEvents = 'auto';
@@ -938,8 +938,8 @@ function renderOverlay() {
       baselinePoints.forEach((point, vIndex) => {
         if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
   
-        const width = 24 * scale;
-        const height = 24 * scale;
+        const width = 18 * scale;
+        const height = 18 * scale;
         const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
         rect.setAttribute('x', point[0] - width / 2);
         rect.setAttribute('y', point[1] - height / 2);
@@ -947,7 +947,7 @@ function renderOverlay() {
         rect.setAttribute('height', height);
         rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
         rect.setAttribute('stroke', '#9F1239');
-        rect.setAttribute('stroke-width', 2.5 * scale);
+        rect.setAttribute('stroke-width', 3 * scale);
         rect.classList.add('overlay-handle');
         rect.style.transformOrigin = `${point[0]}px ${point[1]}px`;
         rect.style.pointerEvents = 'auto';
@@ -1485,15 +1485,15 @@ const STEP_INFO = {
   '1': {
     title: 'Some notes',
     body: `
-        <ol class="info-steps">
-      <p> You can choose neither, one or more options as preferred.<p>
-      <li><strong>Gaussian normalization</strong>: This method is quite good in my experience and I would recommend it. It estimates the background texture, and then removes it from the image. It works very well for images which have dark shadows and the text is hard to read</li>
+      <p> All three methods are optional. You can apply none, one, or several.<p>
 
-      <li><strong>Sauvola binarization</strong>: This method is also good, but can be very harsh for the scripts. I think it works well too for dark shaded regions, but can spoil the faded text areas, and the model performance reduces. Be careful when using.</li>
-      <li><strong>CLAHE lighting correction</strong>: It is useful as a method when there is uneven ligting in the document. For example, if one half of the page is very light, and the other half is very dark. It balances the contrast (locally), and can help improve the text readability.</li>
+      <ol class="info-steps">
+      <li><strong>Gaussian normalization</strong>: It estimates the background texture, and then removes it from the image. It works very well for images which have dark shadows and the text is hard to read. Most recommended.</li>
+      <li><strong>Sauvola binarization</strong>: It converts the image to black and white, and is effective for areas with dark shadows and stains, but can damage faded text areas, and reduce model accuracy. Please use carefully.</li>
+      <li><strong>CLAHE lighting correction</strong>: It balances lighting across the page by balancing contrast (locally), and can thereby help improve the text readability. It is useful when one part of the page is very light, and the other part is very dark.</li>
 </ol>
     <div class="info-note">
-      <strong>Note:</strong> The default ranges set are what worked the best when I tried generally, but you can change it as you like. Also a nice way to check it is by zooming in the image well, and seeing if the text pixels are smooth, or if it ends abruptly. If it is smooth, it is better for the model.
+      <strong>Note:</strong> The default values are a good starting point. One way to check if a method is helping is to zoom in and see if the text pixels look smooth (smoother edges generally mean better model performance). 
     </div>
       `
   },
@@ -1502,21 +1502,20 @@ const STEP_INFO = {
     body: `
     <ol class="info-steps">
       <li>Click  <strong>Run segmentation</strong> which will automatically detect individual text lines</li>
-      <li>Please note that it is very rare that the segmentations are perfect (we need to improve the model as we go)</li>
-      <li>Since there are errors, you can choose to edit it (like in eScriptorium)</li>
-      <li>There are three edits you can make:
+      <li>Please note that segmentations usually requires some editing</li>
+      <li>There are three types edit options available:
       <ol class="info-substeps">
 
-      <li> Click on the polygon (in the image) →you can delete it</li>
-
-      <li> Click on the polygon (in the image) →you can move around the coordinates to improve the predicted coordinates</li>
-      <li> If there is no polygon for a specific line, or you would like to redraw one →there is a small icon with a line and two dots in the preview bar → click on it → then click on the begining of the line you want to segment →  a green dot and line will appear → then click on the end of the line → then press ENTER to save → the polygon will appear </li>
+      <li> <strong>Delete:</strong> click a polygon to select it, then click the delete button that appears</li>
+      <li> <strong>Reshape:</strong> click a polygon to select it, then drag its corner handles to adjust</li>
+      <li> <strong>Draw new:</strong> click the line icon in the preview bar, then click along the text line to place points on the image, finally press Enter to save. Additionally, the delete key can be also used to undo a drawn baseline point.</li>
 </ol>
 </li>
       </ol>
     <div class="info-note">
-      <strong>Note 1:</strong> There is also a box with top/down/left/right rows which is active when you click on a polygon. Since it can be tedious to drag each polygon coordinate one by one, this option lets you drag all coordinates in one side of the polygon (eg all coordinates at the top) together. It is just a faster way and can help sometimes. 
-      <strong>Note 2:</strong> You can press control + A to select all polygons and delete. 
+      <strong>Note 1:</strong> When a polygon is selected, padding slides appear on the right (top/down/left/right) which allow to shift all coordinates on one side at once.
+      <br>
+      <strong>Note 2:</strong> <strong>Ctrl + A</strong> selects all polygons at once, and can be deleted in once click (if required). 
 
     </div>
     `
@@ -1525,16 +1524,17 @@ const STEP_INFO = {
     title: 'Some notes',
     body: `
         <ol class="info-steps">
-      <li>Please click on <strong>Run OCR</strong> to run the trained HTR/OCR model.</li>
-      <li> It will give the image transcriptions line by line. </li>
-      <li>You can also click on any polygon on the image to check the model's prediction for that specific polygon/line.</li>
-      <li> Along with, you should also see the model confidence predicted. </li>
-            </ol>
+      <li>Please click on <strong>Run OCR</strong> to run the trained HTR/OCR model</li>
+      <li> It will give the image transcriptions line by line</li>
+      <li> Clicking on any polygon on the image highlights its corresponding transcription in the right pannel</li>
+      <li> The model confidence for each predicted token can be viewed using the checkbox</li>
+      <li> To edit the predictions, click on pen icon; and to see if any words matched with the lexicon click on dictionary icon</li>
+      <li> Download the models predicted transcription (with edits, if any) using the download transcription button</li>
+      </ol>
 
       <div class="info-note">
-      <strong>Note:</strong> Please note that the probabilities are just an indication of how confident a model was while predicting a specific character and does not indicate a correct / incorrect prediction. It can be both helpful and not helpful to find the errors.
+      <strong>Note:</strong> Please note that the probabilities are just an indication of how confident a model was while predicting a specific character and does not indicate a correct or incorrect prediction.
       
-      <strong>Note:</strong> To add: dictionary / lexicon matching of the words.
 
       </div>
 

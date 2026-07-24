@@ -267,7 +267,7 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Image cleaning methods: you can choose one or more as preffered.</p>
+                <p class="placeholder-text">Select any methods you would like to apply before proceeding, or skip this step entirely (optional).</p>
                 
                 <label class="option-card {% if selected_doc.preprocessing_settings.gaussian %}checked{% endif %}" id = "gaussian-card">
                   <input type="checkbox" id="gaussian-checkbox" {% if selected_doc.preprocessing_settings.gaussian %}checked{% endif %}>
@@ -300,7 +300,7 @@
                   </span>
                   <span class="option-text">
                     <span class="option-title">Sauvola binarization</span>
-                    <span class="option-desc">Converts to black-and-white text. Note: this is very good for dark regions, but is harsh for light regions.</span>
+                    <span class="option-desc">Converts the image to black-and-white pixels. This method is effective high contrast and areas with dark shadows and stains, but may lose detail in faded or lightly inked areas.</span>
                 
                     <div class="slider-row" id="window-slider-row" style="display: {% if selected_doc.preprocessing_settings.sauvola %}flex{% else %}none{% endif %};">
                       <span class="slider-label">Window size</span>
@@ -371,13 +371,13 @@
                 <!-- <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p> -->
                 <p class="credit-text">Model used: <strong>Kraken (blla.model)</strong>, with designing fully inspired from <strong>eScriptorium</strong></a>.</p>
 
-                <p class="placeholder-text">Click run segmentaiton to automatically detect lines. You can also edit it if required.</p>
+                <p class="placeholder-text">Click <strong>Run Segmentaiton</strong> to automatically detect lines. You can also edit the segmentations if required.</p>
 
 
-                <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run segmentation</button>
+                <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run Segmentation</button>
 
                 <div class="padding-controls" id="padding-controls" style="display:none;">
-                  <p class="placeholder-text" style="margin-bottom:4px;">Select a line, then adjust its padding:</p>
+                  <p class="placeholder-text" style="margin-bottom:4px;">Select a polygon, then adjust its padding:</p>
                   <div class="padding-row">
                     <span class="padding-label">Top</span>
                     <input type="range" id="padding-top" min="-500" max="500" value="0">
@@ -441,7 +441,7 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Click the Run OCR button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. Please go back to the previous step to modify segmentations and run the model again.</p>
+                <p class="placeholder-text">Click the <strong>Run OCR</strong> button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. To make changes, please go back to the previous step.</p>
               
                 <div class="ocr-action-zone">
                   <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
