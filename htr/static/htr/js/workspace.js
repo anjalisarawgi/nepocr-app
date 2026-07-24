@@ -1401,7 +1401,7 @@ function exitDrawMode() {
   lineOverlay.style.cursor = 'default';
   lineOverlay.style.pointerEvents = 'none';
   originalPolygons = {};
-  linePaddingValues = {}; // ← add this
+  linePaddingValues = {}; 
   selectedIndices = new Set();
   if (paddingTop) {
     paddingTop.value = 0;
@@ -1575,113 +1575,41 @@ infoModalBackdrop.addEventListener('click', (e) => {
 });
 
 
-// ///////////////////////////////// OCR EDIT MODE /////////////////////////////////
-// const editOcrBtn = document.getElementById('edit-ocr-btn');
-// let isEditingOcr = false;
-
-// function saveOcrEdits() {
-//   const rows = document.querySelectorAll('.ocr-line-result');
-//   const updatedPredictions = [];
-
-//   rows.forEach((row) => {
-//     const lineIndex = parseInt(row.dataset.lineIndex);
-//     const textSpan = row.querySelector('.ocr-line-text');
-//     const newText = textSpan.innerText.trim();
-//     updatedPredictions.push({ line_index: lineIndex, text: newText });
-//   });
-
-//   fetch(`/edit-ocr/${currentDocId}/`, {
-//     method: 'POST',
-//     headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
-//     body: JSON.stringify({ predictions: updatedPredictions }),
-//   })
-//     .then((res) => res.json())
-//     .then((data) => {
-//       if (data.success) {
-//         console.log('OCR edits saved');
-//       }
-//     });
-// }
-
-// const nepaliKeyboard = document.getElementById('nepali-keyboard');
-// let activeEditableEl = null;
-
-// // SINGLE listener now — handles toggle + keyboard + save
-// editOcrBtn.addEventListener('click', () => {
-//   isEditingOcr = !isEditingOcr;
-
-//   document.querySelectorAll('.ocr-line-text').forEach((el) => {
-//     el.contentEditable = isEditingOcr;
-//   });
-
-//   document.querySelectorAll('.ocr-line-result').forEach((row) => {
-//     row.classList.toggle('editing-row', isEditingOcr);   // ← toggle on the row
-//   });
-
-//   nepaliKeyboard.style.display = isEditingOcr ? 'flex' : 'none';
-//   editOcrBtn.textContent = isEditingOcr ? 'Save' : 'Edit';
-
-//   if (!isEditingOcr) {
-//     saveOcrEdits();
-//     activeEditableEl = null;
-//   }
-// });
-
-
-// // track which line is currently focused for typing
-// document.getElementById('ocr-results').addEventListener('focusin', (e) => {
-//   if (e.target.classList.contains('ocr-line-text')) {
-//     activeEditableEl = e.target;
-//   }
-// });
-
-// // keyboard button clicks insert at cursor
-// nepaliKeyboard.addEventListener('click', (e) => {
-//   const btn = e.target.closest('.key');
-//   if (!btn || !activeEditableEl) return;
-
-//   activeEditableEl.focus();
-//   const key = btn.dataset.key;
-
-//   if (key === 'backspace') {
-//     document.execCommand('delete');
-//   } else if (key === 'space') {
-//     document.execCommand('insertText', false, ' ');
-//   } else {
-//     document.execCommand('insertText', false, btn.textContent);
-//   }
-// });
-
 ///////////////////////////////// OCR EDIT MODE /////////////////////////////////
+// this is to store which line we are currently editing etc
 let isEditingOcr = false;
 let editingLineIndex = null;
 const nepaliKeyboard = document.getElementById('nepali-keyboard');
 let activeEditableEl = null;
 
+// for dictionary matched words! 
 const wordsPopup = document.createElement('div');
 wordsPopup.id = 'matched-words-popup';
 wordsPopup.className = 'matched-words-popup';
 wordsPopup.style.display = 'none';
 document.body.appendChild(wordsPopup)
 
+// 
 function saveOcrEdits() {
   const rows = document.querySelectorAll('.ocr-line-result');
   const updatedPredictions = [];
 
   rows.forEach((row) => {
-    const lineIndex = parseInt(row.dataset.lineIndex);
-    const textSpan = row.querySelector('.ocr-line-text');
-    const newText = textSpan.innerText.trim();
+    const lineIndex = parseInt(row.dataset.lineIndex); // for each row we want to get its line number and read whatever text is currently visible
+    const textSpan = row.querySelector('.ocr-line-text'); 
+    const newText = textSpan.innerText.trim();  // innerText gives plain rendered text, so if the user types something, we get their edit 
     
-    // only update plain text, leave data-html (confidence) intact
+    //  note: we have data-html (colored confidence versions) and data-plain (the  plain text version)
+    // so this part makes sure that when the user edits the text, only the visible content changes
     textSpan.dataset.plain = newText;
-    
     updatedPredictions.push({ line_index: lineIndex, text: newText });
   });
 
-  // re-apply confidence visibility based on current checkbox state
+  // re-apply confidence visibility logic (for checbox) because after edit, the text becomes raw text and loses it
+  // so if the checkbox is ticked - we show the coloured data-html and if not, we show the updated data-plain
   applyConfidenceVisibility();
 
+  // send all updates to Django in one post request, and django will save it ot the databas e so if the user refreshes the page, the edits are preserved
   fetch(`/edit-ocr/${currentDocId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
@@ -1689,18 +1617,43 @@ function saveOcrEdits() {
   })
     .then((res) => res.json())
     .then((data) => {
-      if (data.success) console.log('OCR edits saved');
+      if (data.success) console.log('OCR edits saved'); // if django says the request was processed well, then we save ocr edits saved in console
     });
 }
 
 
-function startEditingLine(lineIndex) {
-  isEditingOcr = true;
-  editingLineIndex = lineIndex;
+//// nepali keyboard
+function positionKeyboardBelowLine(row) {
+  // get the right panels position
+  const rightCol = document.querySelector('.right-col');
+  const rightColRect = rightCol.getBoundingClientRect();
+  const kb = nepaliKeyboard;
+  
+  // reset it with these new values
+  kb.style.top = 'auto';
+  kb.style.bottom = '16px';
+  kb.style.left = 'auto';
+  kb.style.right = (window.innerWidth - rightColRect.left + 8) + 'px'; // positioning it to the left of the panel 
 
-  selectedIndices = new Set([lineIndex]);
+  // if keyboard is taller than available space, we cap the hight and scroll it so its jis just a safety check
+  const maxHeight = window.innerHeight - 32;
+  kb.style.maxHeight = maxHeight + 'px';
+  kb.style.overflowY = kb.scrollHeight > maxHeight ? 'auto' : 'visible';
+}
+
+
+
+///
+function startEditingLine(lineIndex) { 
+  isEditingOcr = true; // editing mode indicator state 
+  editingLineIndex = lineIndex; // and this editing is in line X
+
+  // highlights the polygon of the selected line
+  selectedIndices = new Set([lineIndex]); 
   renderOverlay();
 
+  // this resets everythign residual befor editiing this line 
+  // eg: cleans and makes sure the editing on all lines is turned off, removes all highlights, removes any leftover save buttons etc
   document.querySelectorAll('.ocr-line-text').forEach((el) => { el.contentEditable = false; });
   document.querySelectorAll('.ocr-line-result').forEach((r) => {
     r.classList.remove('editing-row', 'selected');
@@ -1708,9 +1661,9 @@ function startEditingLine(lineIndex) {
   document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => {
     btn.classList.remove('is-saving');
   });
-  // remove any leftover save buttons
   document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove());
 
+  // activates thsi specific line 
   const row = document.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
   if (!row) return;
 
@@ -1719,10 +1672,12 @@ function startEditingLine(lineIndex) {
   textSpan.contentEditable = true;
   textSpan.focus();
 
+  // swapping pencil icon to checmark
   const editBtn = row.querySelector('.ocr-line-edit-btn');
   editBtn.classList.add('is-saving');
 
-  // inject save button after the text span
+  // the green save button after the text span
+  // svg is the green icon
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
   saveBtn.className = 'ocr-save-btn';
@@ -1732,65 +1687,79 @@ function startEditingLine(lineIndex) {
     <polyline points="20 6 9 17 4 12"/>
   </svg>`;
   saveBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    stopEditingLine();
+    e.stopPropagation(); // ??
+    stopEditingLine(); // when green icon is clicked, then it triggers stopEditingLine
   });
   row.appendChild(saveBtn);
 
+  // lock other rows when one is beign edited
   document.getElementById('ocr-results').classList.add('locked-editing');
 
+  // show the nepali keyboard also on eiditng nad position it 
   nepaliKeyboard.style.display = 'flex';
   positionKeyboardBelowLine(row);
 }
 
-function positionKeyboardBelowLine(row) {
-  const rightCol = document.querySelector('.right-col');
-  const rightColRect = rightCol.getBoundingClientRect();
-  const kb = nepaliKeyboard;
-  
-  // reset first so we can measure true height
-  kb.style.top = 'auto';
-  kb.style.bottom = '16px';
-  kb.style.left = 'auto';
-  kb.style.right = (window.innerWidth - rightColRect.left + 8) + 'px';
-
-  // if keyboard is taller than available space, cap it and scroll
-  const maxHeight = window.innerHeight - 32;
-  kb.style.maxHeight = maxHeight + 'px';
-  kb.style.overflowY = kb.scrollHeight > maxHeight ? 'auto' : 'visible';
-}
 
 
-
+// the exact reverse kind of of starteditiing line
+// undoes everything
 function stopEditingLine() {
-  isEditingOcr = false;
+  isEditingOcr = false; // flag to say we are not editing anything
   editingLineIndex = null;
 
+  // undo ll vidual changes
   document.querySelectorAll('.ocr-line-text').forEach((el) => { 
     el.contentEditable = false;
   });
-  document.querySelectorAll('.ocr-line-result').forEach((r) => { r.classList.remove('editing-row'); });
-  document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => { btn.classList.remove('is-saving'); });
-  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove());
+  document.querySelectorAll('.ocr-line-result').forEach((r) => { r.classList.remove('editing-row'); }); // turn of typing 
+  document.querySelectorAll('.ocr-line-edit-btn').forEach((btn) => { btn.classList.remove('is-saving'); }); // remove orange border highlights from each row
+  document.querySelectorAll('.ocr-save-btn').forEach(b => b.remove()); // swap checkmark icon to the pencil icon
 
+  // unlock all rows (oppositive in line eiditng active which locks it)
   document.getElementById('ocr-results').classList.remove('locked-editing');
   nepaliKeyboard.style.display = 'none';
 
-  nepaliKeyboard.style.top = 'auto';
-  nepaliKeyboard.style.left = 'auto';
-  nepaliKeyboard.style.bottom = '16px';
-  nepaliKeyboard.style.right = '';
+  // nepaliKeyboard.style.top = 'auto';
+  // nepaliKeyboard.style.left = 'auto';
+  // nepaliKeyboard.style.bottom = '16px';
+  // nepaliKeyboard.style.right = '';
 
-  activeEditableEl = null;
+  activeEditableEl = null; 
+  saveOcrEdits(); // the final edit state
+}
+///////////////////////////////////////////////////////
 
-  saveOcrEdits(); // this now calls applyConfidenceVisibility() at the end
+///////// dictionary popup ///////
+function highlightWordsInLine(row, words) {
+  const textSpan = row.querySelector('.ocr-line-text');
+  if (!textSpan) return;
+  const plain = textSpan.dataset.plain || textSpan.innerText;
+  textSpan.dataset.beforeHighlight = plain;
+
+  // handle both [{word, lemma}] and ['word'] formats ??
+  const wordStrings = words.map(w => typeof w === 'string' ? w : w.word);
+  const escaped = wordStrings.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
+  const highlighted = plain.replace(pattern, `<mark class="dict-highlight">$1</mark>`);
+  textSpan.innerHTML = highlighted;
+}
+
+
+// this function restores the line back -- after the dict popups
+function restoreLineText(row) {
+  const textSpan = row.querySelector('.ocr-line-text');
+  if (!textSpan || !textSpan.dataset.beforeHighlight) return;
+  const showConfidence = confidenceCheckbox.checked;
+  textSpan.innerHTML = showConfidence ? textSpan.dataset.html : textSpan.dataset.plain;
+  delete textSpan.dataset.beforeHighlight;
 }
 
 
 
+// just a click listenter
 document.getElementById('ocr-results').addEventListener('click', (e) => {
-
-  // 1. dict button
+  // 1. was the dictionary button that was clicked?
   const dictBtn = e.target.closest('.ocr-line-dict-btn');
   if (dictBtn) {
     e.stopPropagation();
@@ -1848,7 +1817,16 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
     return;
   }
 
-  // 2. edit button
+
+  // when clicked outside, close the dict popups
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
+      wordsPopup.style.display = 'none';
+      document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
+    }
+  });
+
+  // 2. was it the edit button that was clicked?
   const editBtn = e.target.closest('.ocr-line-edit-btn');
   if (editBtn) {
     e.stopPropagation();
@@ -1862,7 +1840,7 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
     return;
   }
 
-  // 3. row click (select polygon)
+  // 3. was the row clicked (for polugon and red highlights?)
   if (isEditingOcr) return;
   const row = e.target.closest('.ocr-line-result');
   if (!row) return;
@@ -1874,53 +1852,29 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
   renderOverlay();
 });
 
-// close popup when clicking outside
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
-    wordsPopup.style.display = 'none';
-    document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
-  }
-});
-
-function highlightWordsInLine(row, words) {
-  const textSpan = row.querySelector('.ocr-line-text');
-  if (!textSpan) return;
-  const plain = textSpan.dataset.plain || textSpan.innerText;
-  textSpan.dataset.beforeHighlight = plain;
-
-  // handle both [{word, lemma}] and ['word'] formats
-  const wordStrings = words.map(w => typeof w === 'string' ? w : w.word);
-  const escaped = wordStrings.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
-  const highlighted = plain.replace(pattern, `<mark class="dict-highlight">$1</mark>`);
-  textSpan.innerHTML = highlighted;
-}
 
 
 
-function restoreLineText(row) {
-  const textSpan = row.querySelector('.ocr-line-text');
-  if (!textSpan || !textSpan.dataset.beforeHighlight) return;
-  const showConfidence = confidenceCheckbox.checked;
-  textSpan.innerHTML = showConfidence ? textSpan.dataset.html : textSpan.dataset.plain;
-  delete textSpan.dataset.beforeHighlight;
-}
 
 
 
+//////////// keyboard functions ////
+// rememebers the text box before we click the keyboard key making typing with the keyboard possible
 document.getElementById('ocr-results').addEventListener('focusin', (e) => {
   if (e.target.classList.contains('ocr-line-text')) {
     activeEditableEl = e.target;
   }
 });
 
+// keyboard handler
 nepaliKeyboard.addEventListener('click', (e) => {
-  const btn = e.target.closest('.key');
-  if (!btn || !activeEditableEl) return;
+  const btn = e.target.closest('.key'); // check that a key was actually clicked 
+  if (!btn || !activeEditableEl) return; // and also if we ahve a text box to type into -- if any one of them is missing, do nothign
 
-  activeEditableEl.focus();
+  activeEditableEl.focus(); // refocus the text span (because clicked the keyboard took the focus away)
+
+  // check if the key has a special data-key element (only backspace and space have this)
   const key = btn.dataset.key;
-
   if (key === 'backspace') {
     document.execCommand('delete');
   } else if (key === 'space') {
@@ -1931,43 +1885,48 @@ nepaliKeyboard.addEventListener('click', (e) => {
 });
 
 
-// Draggable keyboard
+
+// Draggable keyboard setup
 const keyboard = document.getElementById('nepali-keyboard');
-let kbDragging = false, kbStartX, kbStartY, kbOrigLeft, kbOrigTop;
-
-
+let kbDragging = false, kbStartX, kbStartY, kbOrigLeft, kbOrigTop; // are we dragging it dcurrently?. where did the drag start?  where was the keyboard when the drag started
 document.querySelector('.keyboard-drag-handle').addEventListener('mousedown', (e) => {
-  kbDragging = true;
-  kbStartX = e.clientX;
-  kbStartY = e.clientY;
+  kbDragging = true;  
+  kbStartX = e.clientX;  // mouse original position to remember
+  kbStartY = e.clientY; 
 
   // read current rendered position regardless of which properties are set
   const rect = keyboard.getBoundingClientRect();
-  kbOrigLeft = rect.left;
+  kbOrigLeft = rect.left; // keyboards original position to remember
   kbOrigTop = rect.top;
-  e.preventDefault();
+  e.preventDefault();  // stopping the highhlgithing text thing when we drag 
 });
 
+
+// move keyboard by the same amount by which the mouse moved
 document.addEventListener('mousemove', (e) => {
-  if (!kbDragging) return;
-  const dx = e.clientX - kbStartX;
-  const dy = e.clientY - kbStartY;
+  if (!kbDragging) return; // only do when we are dragging
+  const dx = e.clientX - kbStartX; // how far has the mouse moved horizontally
+  const dy = e.clientY - kbStartY; // how far has the mouse moved veritically
 
   // always drag using top/left
   keyboard.style.bottom = 'auto';
   keyboard.style.right = 'auto';
-  keyboard.style.top = (kbOrigTop + dy) + 'px';
+  keyboard.style.top = (kbOrigTop + dy) + 'px'; // original position + how far it moved
   keyboard.style.left = (kbOrigLeft + dx) + 'px';
 });
 
+// when we release the mouse - stop dragging -- stop
 document.addEventListener('mouseup', () => { kbDragging = false; });
 
 
-// download ocr update
+
+////////////////////// download ocr button ///////////////////////
+// download ocr  - to also be able to download the updates
+
 document.getElementById('download-ocr-btn').addEventListener('click', () => {
   const rows = document.querySelectorAll('.ocr-line-result');
   const lines = [];
-
+  // collect from every OCR line on the screen into an array
   rows.forEach((row) => {
     const textSpan = row.querySelector('.ocr-line-text');
     if (textSpan) {
@@ -1975,10 +1934,13 @@ document.getElementById('download-ocr-btn').addEventListener('click', () => {
     }
   });
 
+  // join th elines all together with a new line 
   const text = lines.join('\n');
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' }); // blob is just a file in memory
+  const url = URL.createObjectURL(blob); // createObjectURL gives a temporary link so the browser can treat it like a downloadable file
+  
+  // triggers file downalod and downloads
+  const a = document.createElement('a'); 
   a.href = url;
   a.download = `transcription-${currentDocId}.txt`;
   document.body.appendChild(a);
@@ -1987,26 +1949,4 @@ document.getElementById('download-ocr-btn').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-
-document.querySelector('.right-col').addEventListener('scroll', () => {
-  if (nepaliKeyboard.style.display !== 'none') {
-    positionKeyboardBelowLine(document.querySelector('.ocr-line-result.editing-row'));
-  }
-});
-
-
-
-// // matched words popup
-// const wordsPopup = document.createElement('div');
-// wordsPopup.id = 'matched-words-popup';
-// wordsPopup.className = 'matched-words-popup';
-// wordsPopup.style.display = 'none';
-// document.body.appendChild(wordsPopup);
-
-
-// // close popup when clicking outside
-// document.addEventListener('click', (e) => {
-//   if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
-//     wordsPopup.style.display = 'none';
-//   }
-// });
+//////////////////////////////////////////////////////////////
