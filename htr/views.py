@@ -63,7 +63,7 @@ import regex as re_regex
 
 @lru_cache(maxsize=1)
 def load_trie_cached():
-    trie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../lemma_trie.json')
+    trie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../models/lemma_trie.json')
     return load_trie(trie_path)
 
 def get_graphemes(text):
