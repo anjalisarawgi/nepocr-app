@@ -31,13 +31,12 @@ import json
 from PIL import ImageDraw
 import pickle
 import regex as re_regex  # rename to avoid clashing with stdlib `re` already imported above
+from .config import * 
 
-
-
-KRAKEN_MODEL_PATH =  '/Users/anjalisarawgi/anaconda3/envs/gnn_hre/lib/python3.8/site-packages/kraken/blla.mlmodel'
-NUM_BEAMS = 1
-MAX_LEN =128
-
+### path defined in the .env file
+KRAKEN_MODEL_PATH =  os.environ.get('KRAKEN_MODEL_PATH')
+###
+ 
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('main_page')
@@ -97,7 +96,7 @@ def greedy_match_line(trie_root, text, min_len=2, max_len=30):
         char_offsets.append(char_offsets[-1] + len(g))
     return [(char_offsets[i], char_offsets[j]) for i, j in matches]
 
-def get_matched_words(trie, text, min_len=3):
+def get_matched_words(trie, text, min_len):
     spans = greedy_match_line(trie, text, min_len=min_len)
     seen = set()
     results = []
@@ -431,7 +430,7 @@ def back_to_segmentation(request, pk):
 ### OCR
 @lru_cache(maxsize=1)
 def load_ocr_model():
-    model_path = "AnjaliSarawgi/model-fullset-57k"
+    model_path = OCR_MODEL_PATH
     hf_token = os.environ.get("HF_TOKEN")
     model = VisionEncoderDecoderModel.from_pretrained(model_path, token=hf_token)
     tokenizer = PreTrainedTokenizerFast.from_pretrained(model_path, token=hf_token)
@@ -465,8 +464,6 @@ def predict_line_with_confidence(pil_crop, topk=3):
 
     seq = out.sequences[0]
     decoded_text = clean_ocr_text(tokenizer.decode(seq, skip_special_tokens=True))
-
-    beta = load_beta_calibrator()
     rows = []
 
     for step, (logits, tgt) in enumerate(zip(out.scores, seq[1:]), start=1):
@@ -527,7 +524,6 @@ def run_ocr(request, pk):
             dy = abs(y2 - y1)
             return dy > dx
 
-        Y_TOLERANCE = 25
 
         def line_sort_key(line):
             polygon = line.get('polygon', [])
@@ -568,7 +564,7 @@ def run_ocr(request, pk):
             crop = seg_img.crop(crop_box)
 
             text, html = predict_line_with_confidence(crop)
-            matched_words = get_matched_words(trie, text, min_len=2)
+            matched_words = get_matched_words(trie, text, min_len=TRIE_MIN_LEN)
             print(f"Line: {text[:30]}... → matches: {matched_words}")
 
             predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'matched_words': matched_words, 'matched_words_json': json.dumps(matched_words, ensure_ascii=False), })
@@ -585,11 +581,11 @@ def run_ocr(request, pk):
 
 
 
-@lru_cache(maxsize=1)
-def load_beta_calibrator():
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = os.path.join(base_dir, 'beta_calibrator.joblib')
-    return joblib.load(path)
+# @lru_cache(maxsize=1)
+# def load_beta_calibrator():
+#     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+#     path = os.path.join(base_dir, 'beta_calibrator.joblib')
+#     return joblib.load(path)
 
 
 
@@ -634,10 +630,7 @@ def highlight_tokens_with_tooltips(line_text, df_tok):
             tooltip_lines.append(f"{html_escape(t) or '∅'}: {prob:.3f}")
 
         tooltip = html_escape("\n".join(tooltip_lines))
-        parts.append(
-            f"<span class='ocr-token {conf_cls}' data-tooltip='{tooltip}'>{html_escape(token)}</span>"
-        )
-
+        parts.append(f"<span class='ocr-token {conf_cls}' data-tooltip='{tooltip}'>{html_escape(token)}</span>")
     return "".join(parts)
 
 
@@ -662,7 +655,6 @@ def edit_ocr(request, pk):
         data = json.loads(request.body)
         updated = data.get('predictions', [])
         predictions = image.ocr_predictions or []
-        
         updated_map = {p['line_index']: p['text'] for p in updated}
 
         for pred in predictions:
