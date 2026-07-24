@@ -1,1 +1,8 @@
 media/
+output.xml
+__pycache__/
+*.pyc
+db.sqlite3
+*.egg-info/
+.env
+.DS_Store
