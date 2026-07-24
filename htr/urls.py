@@ -23,8 +23,4 @@ urlpatterns =[
     path('run-ocr/<int:pk>/', views.run_ocr, name='run_ocr'),
     path('download-ocr-text/<int:pk>/', views.download_ocr_text, name='download_ocr_text'),
     path('edit-ocr/<int:pk>/', views.edit_ocr, name='edit_ocr'),
-
-
-
-
 ]   
