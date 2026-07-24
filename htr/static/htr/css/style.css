@@ -1537,7 +1537,7 @@ mark.dict-highlight {
   background: var(--success-soft);
   border: 1px solid var(--success);
   color: var(--success);
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 4px 10px;
   font-size: 13px;
   font-family: var(--serif);
@@ -1545,7 +1545,7 @@ mark.dict-highlight {
 
 
 .chip-lemma {
-  color: var(--ink-soft);
+  color: var(--ink);
   font-size: 12px;
 }
 .matched-word-chip::after {
