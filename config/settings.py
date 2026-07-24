@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app']
@@ -86,7 +86,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #     }
 # }
 
-### postgres
+### postgresf
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -97,10 +97,7 @@ DATABASES = {
         'PORT': os.environ.get('DB_PORT'),
     }
 }
-# CREATE DATABASE myapp_db;
-# CREATE USER myapp_user WITH PASSWORD 'yourpassword';
-# GRANT ALL PRIVILEGES ON DATABASE myapp_db TO myapp_user;
-# \q
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -137,6 +134,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
