@@ -32,11 +32,14 @@ from PIL import ImageDraw
 import pickle
 import regex as re_regex  # rename to avoid clashing with stdlib `re` already imported above
 from .config import * 
+from .utils.trie import load_trie, TrieNode
+
 
 ### path defined in the .env file
 KRAKEN_MODEL_PATH =  os.environ.get('KRAKEN_MODEL_PATH')
-###
- 
+
+
+### user login and logout
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('main_page')
@@ -57,9 +60,8 @@ def logout_view(request):
     return redirect('login')
 
 
-from .utils.trie import load_trie, TrieNode
-import regex as re_regex
 
+### helpers for lemma and trie matching
 @lru_cache(maxsize=1)
 def load_trie_cached():
     trie_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../models/lemma_trie.json')
@@ -116,6 +118,8 @@ def get_matched_words(trie, text, min_len):
     return results
 
 
+
+##### upload image
 @login_required
 def upload_image(request, pk = None):
     if request.method == 'POST':
@@ -146,7 +150,7 @@ def upload_image(request, pk = None):
 
 
     
-
+## delete image
 @login_required
 def delete_image(request, pk):
     image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
@@ -183,6 +187,8 @@ def reset_image(request, pk):
             return JsonResponse({'success': True, 'new_url': image.original_image.url})
     return JsonResponse({'success': False})
 
+
+### preprocessing
 @login_required
 def advance_to_preprocessing(request, pk):
     if request.method == 'POST':
@@ -193,8 +199,6 @@ def advance_to_preprocessing(request, pk):
         image.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
-
-
 
 
 @login_required
@@ -286,16 +290,14 @@ def advance_to_segmentation(request, pk):
 
 
 
-
+#### segmentation
 @login_required
 def run_segmentation(request, pk):
     if request.method == 'POST':
         image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
-
         source_field = image.processed if image.processed else image.locked_image
         source_field.open()
         pil_image = Image.open(io.BytesIO(source_field.read())).convert('RGB')
-
         model = vgsl.TorchVGSLModel.load_model(KRAKEN_MODEL_PATH)
         result = blla.segment(pil_image, model=model)
 
@@ -335,30 +337,6 @@ def save_segmentation(request, pk):
         image.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
-
-
-
-
-@login_required
-def export_alto_xml(request, pk):
-    image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
-
-    source = image.processed if image.processed else image.locked_image
-    width = source.width if source else 0
-    height = source.height if source else 0
-
-    xml_content = render_to_string('htr/alto_template.xml', {
-        'filename': image.filename,
-        'width': width,
-        'height': height,
-        'lines': image.line_coordinates,
-    })
-
-    response = HttpResponse(xml_content, content_type='application/xml')
-    response['Content-Disposition'] = f'attachment; filename="{image.filename}_lines.xml"'
-    return response
-
-
 
 
 
@@ -415,15 +393,6 @@ def advance_to_ocr(request, pk):
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
 
-
-@login_required
-def back_to_segmentation(request, pk):
-    if request.method == 'POST':
-        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
-        image.status = 'segmented'
-        image.save()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False})
 
 
 
@@ -667,6 +636,15 @@ def edit_ocr(request, pk):
         return JsonResponse({'success': True})
     return JsonResponse({'success': False})
 
+
+@login_required
+def back_to_segmentation(request, pk):
+    if request.method == 'POST':
+        image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+        image.status = 'segmented'
+        image.save()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
 
 
 
