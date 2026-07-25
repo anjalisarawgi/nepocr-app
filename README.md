@@ -82,19 +82,30 @@ python manage.py collectstatic
 python manage.py runserver 
 ```
 
-### Some notes:
-##### i. For step 7, we initally created username: admin, and password: admin in my computer setup. But as you prefer?
-ii. I am not sure about what the best way to handle login would be. Maybe we can create a login id for a user when the user sends a request / email? and we create it for them? or create a proper registration page which will allow for all safety checks before creating eg verification?
-One way to create users is also to: log into `/admin/` with your superuser account. Under the Users section you can create new accounts. Each user can only see their own uploaded documents.
+## Some notes:
+### Adding users and login setup:
+Once the superuser is created (from step 7) (eg: username = admin), we can go to the `url/admin/` page and log in with the admin credentials created. Under the users section, then, we can create new accounts for anyone who needs access. In this case, each user can also only see their own uploaded documents.
+
+**Note**: I am not sure about what the best way to handle login would be. With the current setup, the users can be only added by us, and the users need to contact us for creating an account. 
+
+Maybe we can create a login id for a user when the user sends a request / email? and we create it for them? or create a proper registration page which will allow for all safety checks before creating eg verification?
+
+**Note on login approach:** Currently users need to contact us to get an account — we create it manually via `/admin/`. This is the simplest and most controlled approach for now. If needed in the future, a self-registration page with email verification can be added.
+
+### HTR model:
+The HTR model (`AnjaliSarawgi/model-fullset-batch4`) is available publicly on HuggingFace, and it downloads automatically on the first run. This can take a few minutes for the first run depending on the internet connection and server capacity, and the subsequent runs will use the cached versions, making it faster.
+
+### Media folder:
+The uploaded and processed images are saved in a `media/` folder, which is created automatically on the first upload. The database only stores the file paths of the images. However, this may require some storage capacity, depending on the number of users and documents.
+
+### Some more model settings:
+Some parameters can be adjusted in `htr/config.py`, depending on the server capacity:
+- `NUM_BEAMS` — Default is 5, but can be reduced to 1
+- `MAX_LEN` — Default is 256, but can be reduced to 128
+
+### Database (to add):
 
 
-## We have an additional config in `htr/config.py`: i think for this if the system / computer is not strognn enought, we can reduce number of beams to 1, but we prefer 5 is possible, and max length to 256 is possible:
-- `NUM_BEAMS` — 1
-- `MAX_LEN` — maximum output length per line
-
-- also note that the repo doesnt not have the machine learning model installed but this is cloned internally in the views.py from a framework called hugging face. it might take some time for it to download the first itme ont he computer, but then from the second time it is fine
-
-- additionally, our database also creates a media/ folder, which saves a copy of all the images with the dayabase only storing the paths. this (depending on the number of users can become heavier or take more space but yeah.
 
 ## Project structure
 ```
