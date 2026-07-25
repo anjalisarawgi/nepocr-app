@@ -77,24 +77,42 @@ python manage.py createsuperuser
 python manage.py collectstatic
 ```
 
-### 9. Start the server
+### 9. Start the server (this is what i used for the development side_
 ```bash
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 
 ```
 
-## Adding users
-Log into `/admin/` with your superuser account. Under the Users section you can create new accounts. Each user can only see their own uploaded documents.
+### Some notes:
+##### i. For step 7, we initally created username: admin, and password: admin in my computer setup. But as you prefer?
+ii. I am not sure about what the best way to handle login would be. Maybe we can create a login id for a user when the user sends a request / email? and we create it for them? or create a proper registration page which will allow for all safety checks before creating eg verification?
+One way to create users is also to: log into `/admin/` with your superuser account. Under the Users section you can create new accounts. Each user can only see their own uploaded documents.
 
-## Files included in the repo
-- `models/lemma_trie.json` — Nepali dictionary for word matching
-- `beta_calibrator.joblib` — confidence calibration for OCR
-- `htr/config.py` — model settings and constants
 
-## Model settings
-Adjustable in `htr/config.py`:
-- `OCR_MODEL_PATH` — HuggingFace model name
-- `NUM_BEAMS` — beam search width
+## We have an additional config in `htr/config.py`: i think for this if the system / computer is not strognn enought, we can reduce number of beams to 1, but we prefer 5 is possible, and max length to 256 is possible:
+- `NUM_BEAMS` — 1
 - `MAX_LEN` — maximum output length per line
-- `TRIE_MIN_LEN` — minimum word length for dictionary matching
-- `Y_TOLERANCE` — pixel tolerance for grouping lines into rows
 
+- also note that the repo doesnt not have the machine learning model installed but this is cloned internally in the views.py from a framework called hugging face. it might take some time for it to download the first itme ont he computer, but then from the second time it is fine
+
+- additionally, our database also creates a media/ folder, which saves a copy of all the images with the dayabase only storing the paths. this (depending on the number of users can become heavier or take more space but yeah.
+
+## Project structure
+nepocr-app/
+├── config/
+│   ├── settings.py       # django settings
+│   ├── urls.py           # root url routes
+├── htr/
+│   ├── config.py         # model settings and constants
+│   ├── views.py          # all app logic
+│   ├── models.py         # database models
+│   ├── urls.py           # url routes
+│   ├── templates/        # html templates
+│   ├── static/           # css and javascript
+│   └── utils/            # helper functions
+├── data/                 # some helper .csv files
+├── models/
+│   ├── kraken_segmentation_finetuned   # kraken segmentation model (blla.model)
+│   └── lemma_trie.json   # nepali dictionary trie
+├── requirements.txt
+├── manage.py
+└── README.md
