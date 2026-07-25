@@ -163,7 +163,7 @@ The app right now uses two main tables in PostgreSQL:
 - Stores image file paths only (actual images are stored in `media/` on disk)
 
 **`media/` folder**
-- Actual image files are saved here on disk, organised into subfolders:
+- Actual image files are all saved on disk and are organised in four subfolders:
   - `uploads/` — original uploaded images
   - `processed/` — cleaned images (from step 1)
   - `locked/` — images locked copy (cropped) before preprocessing
