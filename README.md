@@ -1,6 +1,6 @@
 # nepocr-app
 
-This is the main project code for the web application for HTR project for Old Nepali manuscripts. 
+This is the main project code for the web application for the HTR project for Old Nepali manuscripts. The app is created using Django and integrates the Kraken segmentation model along with a trained transformer model (through Hugging Face). 
 
 ## Main requirements
 - Python 3.8
@@ -97,6 +97,7 @@ One way to create users is also to: log into `/admin/` with your superuser accou
 - additionally, our database also creates a media/ folder, which saves a copy of all the images with the dayabase only storing the paths. this (depending on the number of users can become heavier or take more space but yeah.
 
 ## Project structure
+```
 nepocr-app/
 ├── config/
 │   ├── settings.py       # django settings
@@ -116,3 +117,5 @@ nepocr-app/
 ├── requirements.txt
 ├── manage.py
 └── README.md
+
+```
