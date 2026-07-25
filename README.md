@@ -158,7 +158,7 @@ The app right now uses two main tables in PostgreSQL:
 **`media/` folder**
 - Actual image files are saved here on disk, organised into subfolders:
   - `uploads/` — original uploaded images
-  - `processed/` — cleaned images
-  - `locked/` — images locked before preprocessing
-  - `backups/` — original backups before cropping
+  - `processed/` — cleaned images (from step 1)
+  - `locked/` — images locked copy (cropped) before preprocessing
+  - `backups/` — original image backups
 
