@@ -85,14 +85,12 @@ python manage.py runserver
 ### 10. Server Deployment
 Before deploying, please update `ALLOWED_HOSTS` and   `CSRF_TRUSTED_ORIGINS` with the domain host names in  `config/settings.py`
 
-​```python
+```python
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'university.edu']
 CSRF_TRUSTED_ORIGINS = ['https://university.edu']
-​```
+```
 
-Note: While deploying the app, if using Gunicorn, we require a timeout of at least 300 seconds:  `--timeout 300`
-
-See `DEPLOYMENT.md` for the full Gunicorn + Nginx (if required).
+Note: While deploying the app, if using Gunicorn, we require a timeout of at least 300 seconds:  `--timeout 300`.
 
 ## Project structure
 ```
