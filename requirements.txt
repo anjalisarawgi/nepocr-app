@@ -11,3 +11,6 @@ scikit-image
 torch
 torchmetrics
 transformers
+python-dotenv
+psycopg2-binary
+
