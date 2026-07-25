@@ -31,6 +31,11 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.app']
 
+# CSRF_TRUSTED_ORIGINS = [
+#     'https://*.ngrok-free.app',
+#     'http://localhost:8090',
+#     'http://127.0.0.1:8090',
+# ]
 
 # Application definition
 
