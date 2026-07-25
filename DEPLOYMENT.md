@@ -15,34 +15,23 @@ Internet → Nginx → Gunicorn → Django app
 
 ## 1. Update Django settings
 
-In `config/settings.py`, update with your server's hostname:
-
+In `config/settings.py`, update with the university server's hostname:
 
 ```python
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'university.edu']
 CSRF_TRUSTED_ORIGINS = ['https://university.edu']
 ```
 
-## 2. Test Gunicorn locally first 
 
-Before setting up systemd, confirm Gunicorn works:
+## 2. Then setup up systemd (to ensure the app is always running )
 
-```bash
-gunicorn config.wsgi:application --bind 127.0.0.1:8000  --workers 3 --timeout 300
-```
-
-Visit the server IP on port 8000 to confirm. Press Ctrl+C to stop once confirmed. Note: `--timeout 300` is required because ML model inference can take time.
-
-
-## 3. Set up systemd (to ensure the app is always running )
-
-Create the service file:
+First, please create a service file:
 
 ```bash
 sudo nano /etc/systemd/system/nepocr.service
 ```
 
-Paste the following (update paths and User):
+Then paste the following (update paths and User, in <> brackets):
 
 ```ini
 [Unit]
@@ -75,13 +64,13 @@ sudo systemctl status nepocr   # should show "active (running)"
 ```
 
 
-## 4. Configure Nginx
+## 3. Configure Nginx
 
 ```bash
 sudo nano /etc/nginx/sites-available/nepocr
 ```
 
-Paste the following (update paths and hostname):
+Paste the following (update paths and hostname, in <> brackets):
 
 ```nginx
 server {
@@ -108,7 +97,7 @@ server {
 }
 ```
 
-Enable and restart Nginx:
+Finally, enable and restart Nginx:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/nepocr /etc/nginx/sites-enabled/
@@ -117,6 +106,6 @@ sudo systemctl restart nginx
 ```
 
 
-## 5. Check app hosted
-Visit the app URL hosted (`http://univerisity.edu`) in the browser and the app should be running. 
+## 4. Check if webapp is hosted
+Visit the app URL hosted (`http://univerisity.edu`) in the browser, and the app should be running. 
 
