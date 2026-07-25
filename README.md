@@ -1,6 +1,6 @@
 # nepocr-app
 
-A web application for handwritten text recognition (HTR) of Old Nepali manuscripts. This app allows the user to upload manuscript images, clean them, segment text lines, and run OCR to get transcriptions.
+This is the main project code for the web application for HTR project for Old Nepali manuscripts. 
 
 ## Main requirements
 - Python 3.8
