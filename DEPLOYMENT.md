@@ -107,5 +107,5 @@ sudo systemctl restart nginx
 
 
 ## 4. Check if webapp is hosted
-Visit the app URL hosted (`http://univerisity.edu`) in the browser, and the app should be running. 
+Visit the app URL hosted (e.g.: `http://univerisity.edu`) in the browser, and the app should be running. 
 
