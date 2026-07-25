@@ -77,12 +77,22 @@ python manage.py createsuperuser
 python manage.py collectstatic
 ```
 
-### 9. Start the server (this is what i used for the development side_
+### 9. Start the server (for local deployment only)
 ```bash
 python manage.py runserver 
 ```
 
+### 10. Server Deployment
+Before deploying, please update `ALLOWED_HOSTS` and   `CSRF_TRUSTED_ORIGINS` with the domain host names in  `config/settings.py`
 
+​```python
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'university.edu']
+CSRF_TRUSTED_ORIGINS = ['https://university.edu']
+​```
+
+Note: While deploying the app, if using Gunicorn, we require a timeout of at least 300 seconds:  `--timeout 300`
+
+See `DEPLOYMENT.md` for the full Gunicorn + Nginx (if required).
 
 ## Project structure
 ```
@@ -111,6 +121,14 @@ nepocr-app/
 
 
 ## Some Notes:
+### ML model:
+The machine learning model downloads from HuggingFace automatically on the first run; it may take a few minutes. This also requires an internet connection on the server.
+
+---
+### Media folder:
+The uploaded and processed images are saved in a `media/` folder on the disk: it should be writable and requires storage
+
+---
 
 ### Adding users and login setup:
 For now, the user accounts can only be created manually by the admin. To create a new user, we can use the following steps:
@@ -125,19 +143,8 @@ Here, each user can only see their own documents.
 
 ---
 
-
-### HTR model:
-The HTR model (`AnjaliSarawgi/model-fullset-batch4`) is available publicly on HuggingFace, and it downloads automatically on the first run. This can take a few minutes for the first run depending on the internet connection and server capacity, and the subsequent runs will use the cached versions, making it faster.
-
----
-
-### Media folder:
-The uploaded and processed images are saved in a `media/` folder, which is created automatically on the first upload. The database only stores the file paths of the images. However, this may require some storage capacity, depending on the number of users and documents.
-
----
-
-### Some more model settings:
-Some parameters can be adjusted in `htr/config.py`, depending on the server capacity:
+### Changeable model settings:
+Some parameters can be adjusted in `htr/config.py`, if the server capacity is not sufficient:
 - `NUM_BEAMS` — Default is 5, but can be reduced to 1
 - `MAX_LEN` — Default is 256, but can be reduced to 128
 
