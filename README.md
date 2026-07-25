@@ -90,7 +90,9 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'university.edu']
 CSRF_TRUSTED_ORIGINS = ['https://university.edu']
 ```
 
-Note: While deploying the app, if using Gunicorn, we require a timeout of at least 300 seconds:  `--timeout 300`.
+**Note:** While deploying the app, if using Gunicorn, we require a timeout of at least 300 seconds:  `--timeout 300`.
+
+**Note:** I have tested deployment locally on macOS using Gunicorn + ngix, and am not sure how deployment would be done on the university server. If required, please refer to `DEPLOYMENT.md` for a guide to set it up using Gunicorn + ngix on Linux.
 
 ## Project structure
 ```
