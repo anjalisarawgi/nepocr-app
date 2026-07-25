@@ -19,6 +19,9 @@ cd nepocr-app
 ```bash
 conda create -n nepocr_env
 conda activate nepocr_env
+```
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -37,7 +40,7 @@ GRANT ALL PRIVILEGES ON DATABASE htr_app TO htruser;
 Replace `htruser` and `yourpassword` with your own values.
 
 ### 4. Create a .env file
-Create a file called `.env` in the project root (same folder as `manage.py`):
+Create a file called `.env` in the project root (same folder as `manage.py`). There is also a `.env.example` file in the project root for reference. 
 ```
 SECRET_KEY=
 DEBUG=False
@@ -49,12 +52,15 @@ DB_PORT=5432
 KRAKEN_MODEL_PATH=models/kraken_segmentation_finetuned/blla.mlmodel
 ```
 
-### 5. To generate a secure secret key run:
-To generate a secure secret key run:
+### 5. Enter the fields in the `.env` file:
+
+First, to generate a secure secret key (for `SECRET_KEY`), please run:
 ```bash
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 Copy the output and paste it as the value for `SECRET_KEY`.
+
+Similarly, for `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT`, please use the same values you chose while setting up the database in step 3. 
 
 ### 6. Run migrations
 ```bash
