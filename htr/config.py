@@ -1,4 +1,4 @@
-OCR_MODEL_PATH = "AnjaliSarawgi/model-fullset-57k"
+OCR_MODEL_PATH =  "AnjaliSarawgi/model-fullset-batch4" #"AnjaliSarawgi/model-fullset-57k"
 NUM_BEAMS = 1  # recommended 5
 MAX_LEN = 128 # recommended 256
 

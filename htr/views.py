@@ -399,11 +399,10 @@ def advance_to_ocr(request, pk):
 ### OCR
 @lru_cache(maxsize=1)
 def load_ocr_model():
-    model_path = OCR_MODEL_PATH
-    hf_token = os.environ.get("HF_TOKEN")
-    model = VisionEncoderDecoderModel.from_pretrained(model_path, token=hf_token)
-    tokenizer = PreTrainedTokenizerFast.from_pretrained(model_path, token=hf_token)
-    processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten", token=None)
+    # hf_token = os.environ.get("HF_TOKEN")
+    model = VisionEncoderDecoderModel.from_pretrained(OCR_MODEL_PATH)
+    tokenizer = PreTrainedTokenizerFast.from_pretrained(OCR_MODEL_PATH)
+    processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()
     return model, tokenizer, processor, device
