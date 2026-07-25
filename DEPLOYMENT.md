@@ -82,7 +82,7 @@ server {
     }
 
     location /media/ {
-        alias </path/to/nepocr-app/media/?;
+        alias </path/to/nepocr-app/media/>;
     }
 
     location / {
