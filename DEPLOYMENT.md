@@ -11,6 +11,11 @@ Internet → Nginx → Gunicorn → Django app
 
 ---
 
+## Prerequisites
+Before starting, please ensure the following is installed:
+- Nginx: `sudo apt install nginx`
+- Gunicorn: `pip install gunicorn`
+
 
 ## 1. Update Django settings
 
