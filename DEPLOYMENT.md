@@ -1,7 +1,6 @@
 # Deployment Guide (if required)
 
-This guide is for server deployment when using **Gunicorn + Nginx**. For initial setup (dependencies, database, migrations, static files), please follow the first 9 steps in the README first.
-
+This guide is for server deployment after the initial setup (first 9 steps in the README) has been completed. This file uses **Gunicorn + Nginx** for deployment. 
 ## Architecture
 
 ```
@@ -23,7 +22,7 @@ CSRF_TRUSTED_ORIGINS = ['https://university.edu']
 ```
 
 
-## 2. Then setup up systemd (to ensure the app is always running )
+## 2. Then we setup the systemd (to ensure the app is always running )
 
 First, please create a service file:
 
@@ -54,7 +53,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable and start it:
+Then, the following steps to enable and start it:
 
 ```bash
 sudo systemctl daemon-reload
@@ -64,7 +63,7 @@ sudo systemctl status nepocr   # should show "active (running)"
 ```
 
 
-## 3. Configure Nginx
+## 3. Configuring Nginx:
 
 ```bash
 sudo nano /etc/nginx/sites-available/nepocr
@@ -97,7 +96,7 @@ server {
 }
 ```
 
-Finally, enable and restart Nginx:
+Finally, enable and restart Nginx as well:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/nepocr /etc/nginx/sites-enabled/
@@ -107,5 +106,5 @@ sudo systemctl restart nginx
 
 
 ## 4. Check if webapp is hosted
-Visit the app URL hosted (e.g.: `http://univerisity.edu`) in the browser, and the app should be running. 
+Please visit the app URL hosted (e.g., `http://univerisity.edu`) in the browser, and the app should be running. 
 
