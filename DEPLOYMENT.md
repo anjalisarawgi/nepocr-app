@@ -9,13 +9,13 @@ Internet → Nginx → Gunicorn → Django app
         Static & media files served directly by Nginx (making it faster)
 ```
 
----
 
 ## Prerequisites
 Before starting, please ensure the following is installed:
 - Nginx: `sudo apt install nginx`
 - Gunicorn: `pip install gunicorn`
 
+--- 
 
 ## 1. Update Django settings
 
