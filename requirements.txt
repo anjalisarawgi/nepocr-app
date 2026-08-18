@@ -1,6 +1,6 @@
 Django
 joblib
-kraken==5.2.9
+kraken==5.3.0
 numpy
 opencv_python
 opencv_python_headless
