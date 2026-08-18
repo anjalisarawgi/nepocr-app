@@ -1,0 +1,16 @@
+Django
+joblib
+kraken
+numpy
+opencv_python
+opencv_python_headless
+pandas
+Pillow
+regex
+scikit-image
+torch
+torchmetrics
+transformers
+python-dotenv
+psycopg2-binary
+gunicorn
