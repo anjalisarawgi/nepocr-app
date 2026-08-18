@@ -42,7 +42,7 @@ class UploadedImage(models.Model):
 
     @property
     def file_label(self):
-        ext = os.path.splitext(self.original_image.name)[1].lower()  # gets '.png', '.jpg', etc.
+        ext = os.path.splitext(self.original_image.name)[1].lower()  # gets '.png', '.jpg', etc - 
         return f"image{ext}"
     
 

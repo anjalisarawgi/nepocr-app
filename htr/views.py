@@ -354,12 +354,13 @@ def add_baseline_polygon(request, pk):
         source_field.open()
         pil_image = Image.open(io.BytesIO(source_field.read())).convert('RGB')
 
+        ##
         baseline_tuple = [tuple(p) for p in baseline_points]
         polygons = kraken_segmentation.calculate_polygonal_environment(pil_image, [baseline_tuple])
 
         polygon = polygons[0] if polygons and polygons[0] is not None else None
         if polygon is None:
-            return JsonResponse({'success': False, 'error': 'Could not compute a polygon for this baseline. Try drawing it closer to the text line.'})
+            return JsonResponse({'success': False, 'error': 'Could not compute a polygon for this baseline. Please try drawing it closer to the text line.'})
 
         polygon_points = [[float(p[0]), float(p[1])] for p in polygon]
 
