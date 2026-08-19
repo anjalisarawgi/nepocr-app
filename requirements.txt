@@ -2,7 +2,6 @@ Django
 joblib
 kraken
 numpy
-opencv_python
 opencv_python_headless
 pandas
 Pillow
