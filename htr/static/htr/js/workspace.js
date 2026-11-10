@@ -44,28 +44,75 @@ document.getElementById('accordion').addEventListener('click', (e) => {
   document.querySelectorAll('.accordion-section').forEach((s) => s.classList.remove('open'));
   if (willOpen) section.classList.add('open');
 });
+document.getElementById('accordion').addEventListener('click', () => requestAnimationFrame(layoutWorkspace));
 
 
 
 // Resizable sidebars
 let isDragging = false;
 let isDraggingRight = false;
-let currentSidebarWidth = 280;
+// panel widths (remembered per browser after the user drags them)
+let currentSidebarWidth = 220;
 let currentRightWidth = 550;
+try {
+  currentSidebarWidth = parseInt(localStorage.getItem('sidebarWidth')) || 220;
+  currentRightWidth = parseInt(localStorage.getItem('rightWidth')) || 550;
+} catch (e) {}
+let sidebarCollapsed = false;
+try { sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === '1'; } catch (e) {}
+
+// AI drawer width (the right column grows by this much while the drawer is open)
+let aiDrawerWidth = 340;
+try { aiDrawerWidth = parseInt(localStorage.getItem('aiDrawerWidth')) || 340; } catch (e) {}
+
+function aiDrawerExtraWidth() {
+  const box = document.getElementById('ai-summary');
+  const panel = document.getElementById('ocr-results-panel');
+  const open = box && !box.classList.contains('collapsed') && panel && panel.offsetParent !== null;
+  return open ? aiDrawerWidth : 0;
+}
+
+function layoutWorkspace() {
+  const left = sidebarCollapsed ? 44 : currentSidebarWidth;
+  const right = currentRightWidth + aiDrawerExtraWidth();
+  workspace.style.gridTemplateColumns = `${left}px 6px 1fr 6px ${right}px`;
+  workspace.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+
+  const toggle = document.getElementById('sidebar-toggle');
+  if (toggle) {
+    toggle.title = sidebarCollapsed ? 'Show documents' : 'Collapse documents';
+    toggle.setAttribute('aria-expanded', sidebarCollapsed ? 'false' : 'true');
+  }
+
+  const split = document.querySelector('.ocr-split');
+  if (split) split.style.setProperty('--ai-w', aiDrawerWidth + 'px');
+}
+layoutWorkspace();
+
+document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  try { localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0'); } catch (e) {}
+  layoutWorkspace();
+});
+
+
 
 // when we press on the left handle 
-handle.addEventListener('mousedown', () => {
+handle.addEventListener('mousedown', (e) => {
+  if (sidebarCollapsed) return;
+  e.preventDefault();
+  
   isDragging = true;
   handle.classList.add('dragging');
+  workspace.classList.add('resizing');
 });
 
-// when we press on the right handle 
-handleRight.addEventListener('mousedown', () => {
+handleRight.addEventListener('mousedown', (e) => {
+  e.preventDefault();
   isDraggingRight = true;
   handleRight.classList.add('dragging');
+  workspace.classList.add('resizing');
 });
-
-
 // when the mouse is moving
 document.addEventListener('mousemove', (e) => {
   if (mouseDownPos) {
@@ -74,14 +121,14 @@ document.addEventListener('mousemove', (e) => {
   }
 
   if (isDragging) {
-    currentSidebarWidth = Math.min(Math.max(e.clientX, 160), 480);
-    workspace.style.gridTemplateColumns = `${currentSidebarWidth}px 6px 1fr 6px ${currentRightWidth}px`;
+    const left = workspace.getBoundingClientRect().left;
+    currentSidebarWidth = Math.min(Math.max(e.clientX - left, 160), 420);
+    layoutWorkspace();
   }
-
   if (isDraggingRight) {
-    const distanceFromRight = window.innerWidth - e.clientX;
-    currentRightWidth = Math.min(Math.max(distanceFromRight, 320), 800);
-    workspace.style.gridTemplateColumns = `${currentSidebarWidth}px 6px 1fr 6px ${currentRightWidth}px`;
+    const right = workspace.getBoundingClientRect().right;
+    currentRightWidth = Math.min(Math.max(right - e.clientX - aiDrawerExtraWidth(), 380), 1100);
+    layoutWorkspace();
   }
 
   if (!isPanning) return;
@@ -91,20 +138,23 @@ document.addEventListener('mousemove', (e) => {
 });
 
 
-// when the mouse is released - stop dragging -- then cursor goes back to normal (css off)
+// when the mouse is released - stop dragging and remember the widths
 document.addEventListener('mouseup', () => {
   isPanning = false;
   mouseDownPos = null;
   previewImage.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
 
-  if (isDragging) {
-    isDragging = false;
-    handle.classList.remove('dragging');
+  if (isDragging || isDraggingRight) {
+    try {
+      localStorage.setItem('sidebarWidth', currentSidebarWidth);
+      localStorage.setItem('rightWidth', currentRightWidth);
+    } catch (e) {}
   }
-  if (isDraggingRight) {
-    isDraggingRight = false;
-    handleRight.classList.remove('dragging');
-  }
+  isDragging = false;
+  isDraggingRight = false;
+  handle.classList.remove('dragging');
+  handleRight.classList.remove('dragging');
+  workspace.classList.remove('resizing');
 });
 
 
@@ -339,6 +389,77 @@ function getCookie(name) {
   return match ? match.pop() : '';
 }
 
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// split text into whole Devanagari characters (e.g. "कि" stays together)
+function splitGraphemes(s) {
+  if (window.Intl && Intl.Segmenter) {
+    const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    return Array.from(seg.segment(s), (x) => x.segment);
+  }
+  return Array.from(s);
+}
+
+// compare model text with edited text, colour what the user added/changed
+function diffHtml(original, edited) {
+  const a = splitGraphemes(original);
+  const b = splitGraphemes(edited);
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  let i = 0, j = 0, out = '', deleted = '';
+  const flushDeleted = () => {
+    if (deleted) {
+      out += `<span class="edit-del" title="Removed: ${escapeHtml(deleted)}"></span>`;
+      deleted = '';
+    }
+  };
+  while (i < n || j < m) {
+    if (i < n && j < m && a[i] === b[j]) {
+      flushDeleted();
+      out += escapeHtml(b[j]);
+      i++; j++;
+    } else if (j < m && (i >= n || dp[i][j + 1] >= dp[i + 1][j])) {
+      flushDeleted();
+      out += `<span class="edit-ins">${escapeHtml(b[j])}</span>`;
+      j++;
+    } else {
+      deleted += a[i];
+      i++;
+    }
+  }
+  flushDeleted();
+  return out;
+}
+
+// one place that decides how a line is shown
+// one place that decides how a line is shown
+function renderLineText(el) {
+  if (el.isContentEditable) return; // don't touch the line being edited
+  const plain = el.dataset.plain || '';
+  const original = el.dataset.original ?? plain;
+  const isEdited = original !== plain;
+  const row = el.closest('.ocr-line-result');
+  if (row) row.classList.toggle('is-edited', isEdited);
+
+  if (textView === 'original') {
+    el.textContent = original; // the model's prediction, untouched
+    return;
+  }
+  if (isEdited) {
+    el.innerHTML = diffHtml(original, plain);
+  } else {
+    el.textContent = plain;
+  }
+}
+
 cropConfirmBtn.addEventListener('click', () => {
   const overlayRect = cropOverlay.getBoundingClientRect();
   const bounds = getVisibleImageRect();
@@ -428,6 +549,51 @@ previewImage.addEventListener('mousedown', startPan);
 document.getElementById('line-overlay').addEventListener('mousedown', startPan);
 document.getElementById('preview-card').addEventListener('mousedown', startPan);
 
+///////////////////////////////// keep the page inside the viewer /////////////////////////////////
+function imageFitInfo() {
+  const bw = previewImage.clientWidth, bh = previewImage.clientHeight;
+  const nw = previewImage.naturalWidth, nh = previewImage.naturalHeight;
+  if (!bw || !bh || !nw || !nh) return null;
+  const s = Math.min(bw / nw, bh / nh);          // how the page is fitted at zoom 1
+  return { bw, bh, w: nw * s, h: nh * s };
+}
+
+// stop the page from being dragged/scrolled off into empty grey space
+function clampPan() {
+  const f = imageFitInfo();
+  if (!f) return;
+  const margin = 16;
+  const w = f.w * zoomLevel, h = f.h * zoomLevel;
+  const maxX = (w - f.bw) / 2 + margin;
+  const maxY = (h - f.bh) / 2 + margin;
+  panX = w <= f.bw ? 0 : Math.min(Math.max(panX, -maxX), maxX);
+  panY = h <= f.bh ? 0 : Math.min(Math.max(panY, -maxY), maxY);
+}
+
+// fill the panel width, start at the top of the page
+function fitToWidth() {
+  const f = imageFitInfo();
+  if (!f) return;
+  zoomLevel = Math.max(1, (f.bw - 32) / f.w);
+  panX = 0;
+  panY = Infinity; // clampPan turns this into "top of the page"
+  applyZoom();
+}
+
+function initialFit() {
+  if (docStatus === 'uploaded') return; // keep the whole page visible while cropping
+  fitToWidth();
+}
+
+if (previewImage.complete && previewImage.naturalWidth) initialFit();
+else previewImage.addEventListener('load', initialFit, { once: true });
+
+// re-check the limits when the window or the side panels are resized
+window.addEventListener('resize', applyZoom);
+if (window.ResizeObserver) {
+  new ResizeObserver(() => applyZoom()).observe(document.getElementById('preview-card'));
+}
+
 
 // zoom buddonts
 document.getElementById('zoom-in-btn').addEventListener('click', () => {
@@ -441,12 +607,13 @@ document.getElementById('zoom-out-btn').addEventListener('click', () => {
 });
 
 document.getElementById('zoom-reset-btn').addEventListener('click', () => {
-  zoomLevel = 1; // back to normal 
-  panX = 0; // reset position
-  panY = 0;
-  applyZoom();
+  if (docStatus === 'uploaded') {
+    zoomLevel = 1; panX = 0; panY = 0;
+    applyZoom();
+  } else {
+    fitToWidth();
+  }
 });
-
 
 // // added feature: double click also zooms
 // previewImage.addEventListener('dblclick', () => {
@@ -483,18 +650,21 @@ function handleWheel(e) {
 document.getElementById('preview-card').addEventListener('wheel', handleWheel, { passive: false });
 
 ///////////////////////////////// next step button in preview bar /////////////////////////////////
-document.getElementById('next-step-btn').addEventListener('click', () => {
-  fetch(`/advance/${currentDocId}/`, {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken') },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        location.reload();
-      }
-    });
-});
+const nextStepBtn = document.getElementById('next-step-btn');
+if (nextStepBtn) {
+  nextStepBtn.addEventListener('click', () => {
+    fetch(`/advance/${currentDocId}/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          location.reload();
+        }
+      });
+  });
+}
 
 ///////////////////////////////// before after toggle /////////////////////////////////
 let beforeUrl = lockedImageUrl;
@@ -715,6 +885,36 @@ function debouncedApplyPadding() {
 
 
 ///////////////////////////////// SEGMENTATION: Kraken /////////////////////////////////
+// which line detection model to use (remembered per browser)
+let segEngine = 'kraken';
+try { segEngine = localStorage.getItem('segEngine') || 'kraken'; } catch (e) {}
+const segEngineToggle = document.getElementById('seg-engine-toggle');
+
+function setSegEngine(engine) {
+  segEngine = engine;
+  try { localStorage.setItem('segEngine', engine); } catch (e) {}
+
+  if (segEngineToggle) {
+    segEngineToggle.querySelectorAll('.engine-card').forEach((card) => {
+      const on = card.dataset.engine === engine;
+      card.classList.toggle('active', on);
+      card.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
+  const runBtn = document.getElementById('run-segmentation-model-btn');
+  if (runBtn) {
+    runBtn.textContent = engine === 'paddle' ? 'Run PaddleOCR detection' : 'Run Kraken segmentation';
+  }
+}
+
+if (segEngineToggle) {
+  segEngineToggle.addEventListener('click', (e) => {
+    const card = e.target.closest('.engine-card');
+    if (card) setSegEngine(card.dataset.engine);
+  });
+  setSegEngine(segEngine);
+}
 
 // run segemnetation model button
 document.getElementById('run-segmentation-model-btn').addEventListener('click', () => {
@@ -725,16 +925,22 @@ document.getElementById('run-segmentation-model-btn').addEventListener('click', 
 
   document.getElementById('processing-overlay').style.display = 'flex';
   // send to django to un kraken
+  const segForm = new FormData();
+  segForm.append('engine', segEngine);
+
   fetch(`/segment/${currentDocId}/`, {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    body: segForm,
   })
     .then((res) => res.json())
     .then((data) => { // django sends the detected lines back
       if (data.success) {
         drawLineOverlay(data.lines, data.page_width, data.page_height);  // draws them on screen 
         autoSaveSegmentation(); // saves then 
-        document.getElementById('advance-to-ocr-btn').disabled = false; // enables the next step button
+        document.getElementById('advance-to-ocr-btn').disabled = data.lines.length === 0;
+      } else {
+        alert(data.error || 'Segmentation failed.');
       }
     })
     .finally(() => {
@@ -769,6 +975,7 @@ function drawLineOverlay(lines, pageWidth, pageHeight) {
   segmentationLines = lines.map(l => ({ // takes the lines django sent back and has 2 things: polygon and baseline
     polygon: l.polygon.map(p => [p[0], p[1]]), // p[0] -- x coord , p[1] -- y coord
     baseline: l.baseline ? l.baseline.map(p => [p[0], p[1]]) : [], // is baselines ecist copy it, or else use empty array instead
+    source: l.source || null, // which model detected this line (kraken / paddle / manual)
   }));
   selectedIndices = new Set(); // after drawing, we just dont want to select anything by default, so it just makes sure nothign i selecting by resetting it to an empty index
   overlayPageWidth = pageWidth; 
@@ -810,15 +1017,68 @@ function startVertexDrag(e, lineIndex, vertexIndex, type) {
 }
 
 
+// highlight the transcription row of a line hovered on the image
+function highlightOcrRow(lineIndex, on) {
+  const row = document.querySelector(`.ocr-line-result[data-line-index="${lineIndex}"]`);
+  if (!row) return;
+  row.classList.toggle('hovered', on);
+  if (on) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// image units per screen pixel (at zoom 1), so handles look the same size on any image
+function unitsPerPx() {
+  const svg = document.getElementById('line-overlay');
+  const rect = svg.getBoundingClientRect();
+  const s = Math.min(rect.width / overlayPageWidth, rect.height / overlayPageHeight) / zoomLevel;
+  return s > 0 && isFinite(s) ? 1 / s : getOverlayScale();
+}
+
+
+// one square drag handle
+function makeHandle(point, r, kind, u) {
+  const size = r * 2;
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  s.setAttribute('x', point[0] - r);
+  s.setAttribute('y', point[1] - r);
+  s.setAttribute('width', size);
+  s.setAttribute('height', size);
+  s.setAttribute('rx', 1.5 * u);          // very slightly softened corners
+  s.setAttribute('stroke-width', 1.5 * u);
+  s.classList.add('overlay-handle', kind);
+  s.style.transformOrigin = `${point[0]}px ${point[1]}px`;
+  s.style.pointerEvents = 'auto';
+  return s;
+}
+
+// small chip in the preview bar: which model the lines come from + how many
+const ENGINE_LABELS = { kraken: 'Kraken', paddle: 'PaddleOCR', manual: 'manual' };
+
+function updateSegSourceTag() {
+  const tag = document.getElementById('seg-source-tag');
+  if (!tag) return;
+  const n = segmentationLines.length;
+  if (!n) {
+    tag.style.display = 'none';
+    return;
+  }
+  const sources = [...new Set(segmentationLines.map((l) => l.source).filter(Boolean))];
+  sources.sort((a, b) => (a === 'manual') - (b === 'manual')); // model first, "manual" last
+  const names = sources.map((s) => ENGINE_LABELS[s] || s).join(' + ');
+
+  tag.textContent = (names ? names + ' · ' : '') + `${n} line${n === 1 ? '' : 's'}`;
+  tag.title = names ? `Lines detected with ${names}` : `${n} lines`;
+  tag.style.display = 'inline-flex';
+}
+
 
 function renderOverlay() {
-  
+  document.querySelectorAll('.ocr-line-result.hovered').forEach((r) => r.classList.remove('hovered'));
   const svg = document.getElementById('line-overlay');
   svg.setAttribute('viewBox', `0 0 ${overlayPageWidth} ${overlayPageHeight}`);
   svg.innerHTML = '';
   svg.style.display = (segmentationLines.length || isDrawingBaseline) ? 'block' : 'none';
   const scale = getOverlayScale();
-
+  const u = unitsPerPx();
   // loop through each line 
   segmentationLines.forEach((line, index) => {
     const points = line.polygon.map(p => p.join(',')).join(' ');
@@ -841,7 +1101,7 @@ function renderOverlay() {
       const isSelected = selectedIndices.has(index);
       polygon.setAttribute('fill', isHovered ? 'rgba(212,138,90,0.35)' : (isSelected ? 'rgba(168,81,46,0.30)' : 'rgba(30,90,200,0.22)'));
       polygon.setAttribute('stroke', isHovered ? 'none' : (isSelected ? '#A8512E' : '#1E3A5F'));
-      polygon.setAttribute('stroke-width', (isHovered ? 0 : (isSelected ? 4 : 0)) * scale);
+            polygon.setAttribute('stroke-width', isHovered ? 0 : (isSelected ? 1.5 * u : 0));
       polygon.style.pointerEvents = 'auto';
       polygon.style.cursor = isReadOnlyOverlay ? 'not-allowed' : 'pointer';
 
@@ -885,9 +1145,21 @@ function renderOverlay() {
           if (didDrag) return;
           selectOcrResultForLine(index);
         });
+
+        // hovering a line on the image highlights its transcription row
+        polygon.addEventListener('mouseenter', () => {
+          if (isPanning) return;
+          highlightOcrRow(index, true);
+          polygon.setAttribute('fill', 'rgba(212,138,90,0.35)');
+        });
+        polygon.addEventListener('mouseleave', () => {
+          highlightOcrRow(index, false);
+          polygon.setAttribute('fill', isSelected ? 'rgba(168,81,46,0.30)' : 'rgba(30,90,200,0.22)');
+        });
       }
       svg.appendChild(polygon);
     }
+    
 
 
     // drawign the baseline -- the one krakne predicted
@@ -898,7 +1170,7 @@ function renderOverlay() {
       baseline.setAttribute('points', baselinePoints);
       baseline.setAttribute('fill', 'none');
       baseline.setAttribute('stroke', '#9F1239');
-      baseline.setAttribute('stroke-width', 4 * scale);
+      baseline.setAttribute('stroke-width', 2 * u);
       baseline.setAttribute('stroke-solid', `${8 * scale} ${3 * scale}`);
       baseline.style.pointerEvents = 'none';
       svg.appendChild(baseline);
@@ -907,64 +1179,41 @@ function renderOverlay() {
 
 
   // drawing dragebale handles in selected polygon  -- when the corner is slee ted the startVertexDrag is started which moves that corner
+    // draggable handles on the selected line(s)
   if (!isReadOnlyOverlay && !isAdjustingPadding) {
     selectedIndices.forEach((selIndex) => {
-      if (!segmentationLines[selIndex]) return;
-    
+      const line = segmentationLines[selIndex];
+      if (!line) return;
+
+      // polygon corners: white circles with a terracotta outline
       if (showPolygons) {
-      segmentationLines[selIndex].polygon.forEach((point, vIndex) => {
-        const size = 18 * scale;
-        const square = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        square.setAttribute('x', point[0] - size / 2);
-        square.setAttribute('y', point[1] - size / 2);
-        square.setAttribute('width', size);
-        square.setAttribute('height', size);
-        square.setAttribute('fill', 'rgba(255,255,255,0.85)');
-        square.setAttribute('stroke', '#1E3A5F');
-        square.setAttribute('stroke-width', 3 * scale);
-        square.classList.add('overlay-handle');
-        square.style.transformOrigin = `${point[0]}px ${point[1]}px`;
-        square.style.pointerEvents = 'auto';
-        square.style.cursor = 'grab';
-        square.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'polygon'));
-        svg.appendChild(square);
-      });
-    }
-  
-    if (showBaselines) {
-      const baselinePoints = segmentationLines[selIndex].baseline;
-      const showEvery = baselinePoints.length > 15 ? 2 : 1;
-  
-      baselinePoints.forEach((point, vIndex) => {
-        if (vIndex % showEvery !== 0 && vIndex !== baselinePoints.length - 1) return;
-  
-        const width = 18 * scale;
-        const height = 18 * scale;
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('x', point[0] - width / 2);
-        rect.setAttribute('y', point[1] - height / 2);
-        rect.setAttribute('width', width);
-        rect.setAttribute('height', height);
-        rect.setAttribute('fill', 'rgba(255,255,255,0.9)');
-        rect.setAttribute('stroke', '#9F1239');
-        rect.setAttribute('stroke-width', 3 * scale);
-        rect.classList.add('overlay-handle');
-        rect.style.transformOrigin = `${point[0]}px ${point[1]}px`;
-        rect.style.pointerEvents = 'auto';
-        rect.style.cursor = 'grab';
-        rect.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'baseline'));
-        svg.appendChild(rect);
-      });
-    }
-  });
-  
-  updateHandleCounterScale();
-}
+        line.polygon.forEach((point, vIndex) => {
+          const c = makeHandle(point, 5 * u, 'vertex', u);
+          c.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'polygon'));
+          svg.appendChild(c);
+        });
+      }
+
+      // baseline points: small solid crimson dots
+      if (showBaselines && line.baseline && line.baseline.length) {
+        const pts = line.baseline;
+        const showEvery = pts.length > 15 ? 2 : 1;
+        pts.forEach((point, vIndex) => {
+          if (vIndex % showEvery !== 0 && vIndex !== pts.length - 1) return;
+          const c = makeHandle(point, 4 * u, 'baseline-pt', u);
+          c.addEventListener('mousedown', (e) => startVertexDrag(e, selIndex, vIndex, 'baseline'));
+          svg.appendChild(c);
+        });
+      }
+    });
+
+    updateHandleCounterScale();
+  }
 
 // shows delete button and padding controls when somehting is selected 
 document.getElementById('delete-line-btn').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
 document.getElementById('padding-controls').style.display = (!isReadOnlyOverlay && selectedIndices.size > 0) ? 'flex' : 'none';
-
+updateSegSourceTag();
 }
 
 // restrore page, lines segments image etc when reloaded
@@ -1059,7 +1308,7 @@ function debouncedSaveSegmentation() {
 }
 
 function updateHandleCounterScale() {
-  const counterScale = 1 / Math.sqrt(Math.max(zoomLevel, 0.5)); // scales the handles smaller when zoomed
+  const counterScale = 1 / Math.max(zoomLevel, 0.5); // keep handles the same size on screen at any zoom
   document.querySelectorAll('.overlay-handle').forEach((el) => {
     el.style.transform = `scale(${counterScale})`;
   });
@@ -1067,6 +1316,7 @@ function updateHandleCounterScale() {
 
 // zooming with the overlays
 function applyZoom() {
+  clampPan();
   const transform = `translate(${panX}px, ${panY}px) scale(${zoomLevel})`;
   previewImage.style.transform = transform; // move + scale the image
 
@@ -1134,7 +1384,9 @@ function selectOcrResultForLine(lineIndex) {
 
   selectedIndices = new Set([lineIndex]);
   renderOverlay();
+  focusExplainItem(lineIndex);   // NEW: jump to this line's explanation
 }
+
 
 function setupOcrHoverHighlight() {
   const resultsDiv = document.getElementById('ocr-results');
@@ -1146,6 +1398,7 @@ function setupOcrHoverHighlight() {
     if (!row) return;
     hoveredLineIndex = parseInt(row.dataset.lineIndex);
     renderOverlay();
+    
   });
 
   resultsDiv.addEventListener('mouseout', (e) => {
@@ -1164,16 +1417,286 @@ setupOcrHoverHighlight();
 
 //////////////////////////////////// OCR Confidence ////////////////////////////////////
 const confidenceCheckbox = document.getElementById('show-confidence-checkbox');
+// remember the confidence toggle across page refreshes
+try { confidenceCheckbox.checked = localStorage.getItem('showConfidence') === '1'; } catch (e) {}
 
-// confidence checkbox
-function applyConfidenceVisibility() {
-  const showConfidence = confidenceCheckbox.checked;
-  document.querySelectorAll('.ocr-line-text').forEach((el) => {
-    el.innerHTML = showConfidence ? el.dataset.html : el.dataset.plain;
+// Original / Edited view switch
+let textView = 'edited';
+const textViewToggle = document.getElementById('text-view-toggle');
+
+function setTextView(view) {
+  textView = view;
+  if (textViewToggle) {
+    textViewToggle.querySelectorAll('.ba-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.view === view);
+    });
+  }
+  applyConfidenceVisibility();
+}
+
+if (textViewToggle) {
+  textViewToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ba-btn');
+    if (btn) setTextView(btn.dataset.view);
   });
 }
 
-confidenceCheckbox.addEventListener('change', applyConfidenceVisibility);
+// confidence checkbox
+function confBucket(c) {
+  if (c >= 0.8) return 'high';
+  if (c >= 0.6) return 'mid';
+  if (c >= 0.4) return 'low';
+  return 'vlow';
+}
+
+// colour the whole row + show a % badge
+// per-character confidence → runs of the same colour, snapped to whole Devanagari characters
+function graphemeConfRuns(text, charConf) {
+  const runs = [];
+  let pos = 0;
+  splitGraphemes(text).forEach((g) => {
+    const s = pos, e = pos + g.length;
+    pos = e;
+    let c = 1;
+    for (const [ts, te, tc] of charConf) {
+      if (ts < e && te > s) c *= tc;
+    }
+    const bucket = confBucket(c);
+    const last = runs[runs.length - 1];
+    if (last && last.bucket === bucket) last.end = e;
+    else runs.push({ start: s, end: e, bucket });
+  });
+  return runs;
+}
+
+// match characters of the model's text to the edited text (same logic as the edit colouring)
+function alignGraphemes(original, edited) {
+  const a = splitGraphemes(original);
+  const b = splitGraphemes(edited);
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const pairs = []; // [origStart, origEnd, newStart, newEnd] for each unchanged character
+  let i = 0, j = 0, ai = 0, bj = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      pairs.push([ai, ai + a[i].length, bj, bj + b[j].length]);
+      ai += a[i].length; bj += b[j].length; i++; j++;
+    } else if (dp[i][j + 1] >= dp[i + 1][j]) {
+      bj += b[j].length; j++;
+    } else {
+      ai += a[i].length; i++;
+    }
+  }
+  return pairs;
+}
+
+// confidence data for the text currently shown (moved onto unchanged characters if the line was edited)
+function charConfForCurrentText(row, textSpan) {
+  const charConf = JSON.parse(row.dataset.charConf || '[]');
+  const plain = textSpan.dataset.plain || '';
+  const original = textSpan.dataset.original ?? plain;
+  if (textView === 'original' || original === plain) return charConf;
+  if (row._confCache && row._confCache.plain === plain) return row._confCache.data;
+
+  const mapped = [];
+  alignGraphemes(original, plain).forEach(([os, oe, ns, ne]) => {
+    let found = false, c = 1, alts = null;
+    for (const [ts, te, tc, ta] of charConf) {
+      if (ts < oe && te > os) {
+        found = true;
+        if (tc <= c) { c = tc; alts = ta || null; }
+      }
+    }
+    if (found) mapped.push([ns, ne, c, alts]);
+  });
+  row._confCache = { plain, data: mapped };
+  return mapped;
+}
+
+// a Range over characters [start, end) of an element, even if the text is split into several pieces
+function rangeFor(el, start, end) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let pos = 0, node, last = null, started = false;
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length;
+    if (!started && start <= pos + len) { range.setStart(node, start - pos); started = true; }
+    if (started && end <= pos + len) { range.setEnd(node, end - pos); return range; }
+    pos += len;
+    last = node;
+  }
+  if (started && last) { range.setEnd(last, last.textContent.length); return range; }
+  return null;
+}
+
+
+// draw coloured blocks BEHIND the text (text itself is never split)
+// draw coloured blocks BEHIND the text (text itself is never split)
+function applyLineConfidence(row) {
+  let layer = row.querySelector('.conf-layer');
+  if (layer) layer.innerHTML = '';
+
+  const textSpan = row.querySelector('.ocr-line-text');
+  if (!textSpan || !confidenceCheckbox.checked || textSpan.isContentEditable) return;
+
+  const charConf = charConfForCurrentText(row, textSpan);
+  if (charConf.length === 0) return;
+
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'conf-layer';
+    row.prepend(layer);
+  }
+
+  const rowRect = row.getBoundingClientRect();
+  const text = textSpan.textContent;
+  graphemeConfRuns(text, charConf).forEach((run) => {
+    if (run.bucket === 'high') return; // confident parts (and newly typed text) stay plain
+    const range = rangeFor(textSpan, run.start, Math.min(run.end, text.length));
+    if (!range) return;
+    const lineH = parseFloat(getComputedStyle(textSpan).lineHeight) || 0;
+    for (const r of range.getClientRects()) {
+      // stretch to the full line height so matras above/below (े ु ृ ...) are covered too
+      const h = Math.max(r.height, lineH);
+      const top = r.top + r.height / 2 - h / 2;
+
+      const box = document.createElement('div');
+      box.className = 'conf-box ' + run.bucket;
+      box.style.left = (r.left - rowRect.left) + 'px';
+      box.style.top = (top - rowRect.top) + 'px';
+      box.style.width = r.width + 'px';
+      box.style.height = h + 'px';
+      layer.appendChild(box);
+    }
+  });
+}
+
+
+
+
+function applyConfidenceVisibility() {
+  document.querySelectorAll('.ocr-line-text').forEach(renderLineText);
+  document.querySelectorAll('.ocr-line-result').forEach(applyLineConfidence);
+}
+
+const ocrResultsEl = document.getElementById('ocr-results');
+if (window.ResizeObserver && ocrResultsEl) {
+  new ResizeObserver(() => {
+    document.querySelectorAll('.ocr-line-result').forEach(applyLineConfidence);
+  }).observe(ocrResultsEl);
+}
+
+
+if (document.fonts) document.fonts.ready.then(applyConfidenceVisibility);
+
+//////////// confidence tooltip (top alternatives on hover) ////////////
+const confTip = document.createElement('div');
+confTip.className = 'conf-tooltip';
+confTip.style.display = 'none';
+document.body.appendChild(confTip);
+
+function hideConfTip() {
+  confTip.style.display = 'none';
+  confTip.dataset.key = '';
+}
+
+// show a vowel sign / virama on a dotted circle so it is visible on its own (e.g. ◌ु)
+function displayPiece(piece) {
+  return /^\p{M}/u.test(piece) ? '◌' + piece : piece;
+}
+
+function showConfTip(key, rect, entries, text, grapheme) {
+  if (confTip.dataset.key === key && confTip.style.display === 'block') return;
+  confTip.dataset.key = key;
+  confTip.innerHTML = '';
+
+  // one column per token (e.g. ष | ◌ु), side by side
+  const cols = document.createElement('div');
+  cols.className = 'conf-tooltip-cols';
+
+  entries.forEach(([ts, te, tc, alts]) => {
+    const col = document.createElement('div');
+    col.className = 'conf-tooltip-col';
+
+
+    if (alts) {
+      const [toks, probs] = alts;
+      toks.forEach((t, i) => {
+        const line = document.createElement('div');
+        line.className = 'conf-tooltip-row' + (i === 0 ? ' top' : '');
+        const tok = document.createElement('span');
+        tok.textContent = t ? displayPiece(t) : '∅';
+        const p = document.createElement('span');
+        p.textContent = (probs[i] ?? 0).toFixed(3);
+        line.append(tok, p);
+        col.appendChild(line);
+      });
+    }
+
+    cols.appendChild(col);
+  });
+
+  confTip.appendChild(cols);
+
+
+  confTip.style.display = 'block';
+  const tipRect = confTip.getBoundingClientRect();
+  let left = rect.left;
+  if (left + tipRect.width > window.innerWidth - 8) left = window.innerWidth - tipRect.width - 8;
+  let top = rect.top - tipRect.height - 6;
+  if (top < 8) top = rect.bottom + 6;
+  confTip.style.left = left + 'px';
+  confTip.style.top = top + 'px';
+}
+
+
+
+ocrResultsEl.addEventListener('mousemove', (e) => {
+  if (!confidenceCheckbox.checked || isEditingOcr) return hideConfTip();
+
+  const textSpan = e.target.closest('.ocr-line-text');
+  const row = textSpan && textSpan.closest('.ocr-line-result');
+  if (!row) return hideConfTip();
+
+  const charConf = charConfForCurrentText(row, textSpan);
+  const text = textSpan.textContent;
+  const pad = 6; // a little extra above/below for matras
+
+  // find the whole Devanagari character under the mouse (e.g. "षु", not just "ष")
+  let pos = 0;
+  for (const g of splitGraphemes(text)) {
+    const s = pos, end = pos + g.length;
+    pos = end;
+    const range = rangeFor(textSpan, s, end);
+    if (!range) continue;
+    for (const r of range.getClientRects()) {
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - pad && e.clientY <= r.bottom + pad) {
+        // every token that produced part of this character
+        const entries = charConf.filter(([ts, te]) => ts < end && te > s);
+        if (!entries.length) return hideConfTip();
+        showConfTip(`${row.dataset.lineIndex}:${s}`, r, entries, text, g);
+        return;
+      }
+    }
+  }
+  hideConfTip();
+});
+
+
+
+ocrResultsEl.addEventListener('mouseleave', hideConfTip);
+ocrResultsEl.addEventListener('scroll', hideConfTip);
+
+
+confidenceCheckbox.addEventListener('change', () => {
+  try { localStorage.setItem('showConfidence', confidenceCheckbox.checked ? '1' : '0'); } catch (e) {}
+  applyConfidenceVisibility();
+});
 applyConfidenceVisibility();
 
 
@@ -1194,6 +1717,8 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           const row = document.createElement('div');
           row.className = 'ocr-line-result';
           row.dataset.lineIndex = pred.line_index;
+          row.dataset.confidence = pred.confidence ?? '';
+          row.dataset.charConf = JSON.stringify(pred.char_conf || []);
         
           const numberSpan = document.createElement('span');
           numberSpan.className = 'ocr-line-number';
@@ -1203,7 +1728,8 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           textSpan.className = 'ocr-line-text';
           textSpan.dataset.html = pred.html;
           textSpan.dataset.plain = pred.text;
-          textSpan.innerHTML = confidenceCheckbox.checked ? pred.html : pred.text;
+          textSpan.dataset.original = pred.text;
+          renderLineText(textSpan);
         
           // matched words chips
           row.dataset.matchedWords = JSON.stringify(pred.matched_words || []);
@@ -1240,11 +1766,18 @@ document.getElementById('run-ocr-btn').addEventListener('click', () => {
           row.appendChild(dictBtn); 
           row.appendChild(editBtn);
           resultsDiv.appendChild(row);
+          applyLineConfidence(row);
         });
 
         
         document.getElementById('ocr-results-panel').style.display = 'flex';
+        layoutWorkspace();
         document.getElementById('ocr-stale-warning').style.display = 'none';
+        const intro = document.getElementById('ocr-intro');
+        if (intro) intro.style.display = 'none';
+
+        aiOutputs = {};      
+        renderAiOutputs();
       }
     })
     .finally(() => {
@@ -1433,7 +1966,7 @@ finishBaselineBtn.addEventListener('click', () => {
       if (data.success) {
         pushHistory();
         const newIndex = segmentationLines.length;
-        segmentationLines.push({ polygon: data.polygon, baseline: data.baseline });
+        segmentationLines.push({ polygon: data.polygon, baseline: data.baseline, source: 'manual' });
         linePaddingValues[newIndex] = { top: 0, bottom: 0, left: 0, right: 0 }; // ← explicit zero
         exitDrawMode();
         autoSaveSegmentation();
@@ -1596,12 +2129,11 @@ function saveOcrEdits() {
 
   rows.forEach((row) => {
     const lineIndex = parseInt(row.dataset.lineIndex); // for each row we want to get its line number and read whatever text is currently visible
-    const textSpan = row.querySelector('.ocr-line-text'); 
-    const newText = textSpan.innerText.trim();  // innerText gives plain rendered text, so if the user types something, we get their edit 
-    
+    const textSpan = row.querySelector('.ocr-line-text');
+    const newText = (textSpan.dataset.plain || '').trim();
     //  note: we have data-html (colored confidence versions) and data-plain (the  plain text version)
     // so this part makes sure that when the user edits the text, only the visible content changes
-    textSpan.dataset.plain = newText;
+    // textSpan.dataset.plain = newText;
     updatedPredictions.push({ line_index: lineIndex, text: newText });
   });
 
@@ -1617,7 +2149,15 @@ function saveOcrEdits() {
   })
     .then((res) => res.json())
     .then((data) => {
-      if (data.success) console.log('OCR edits saved'); // if django says the request was processed well, then we save ocr edits saved in console
+      if (!data.success) return;
+      console.log('OCR edits saved');
+      if (data.changed) {
+        Object.values(aiOutputs).forEach((out) => {
+          if (out.summary) out.summary_stale = true;
+          if (out.explanation) out.explanation_stale = true;
+        });
+        renderAiOutputs();
+      }
     });
 }
 
@@ -1669,7 +2209,9 @@ function startEditingLine(lineIndex) {
 
   row.classList.add('editing-row', 'selected');
   const textSpan = row.querySelector('.ocr-line-text');
+  textSpan.textContent = textSpan.dataset.plain;
   textSpan.contentEditable = true;
+  applyLineConfidence(row);
   textSpan.focus();
 
   // swapping pencil icon to checmark
@@ -1705,8 +2247,13 @@ function startEditingLine(lineIndex) {
 // the exact reverse kind of of starteditiing line
 // undoes everything
 function stopEditingLine() {
+  // store what was typed in the line being edited (must run BEFORE editing-row is removed)
+  const editedSpan = document.querySelector('.ocr-line-result.editing-row .ocr-line-text');
+  if (editedSpan) editedSpan.dataset.plain = editedSpan.innerText.trim();
+
   isEditingOcr = false; // flag to say we are not editing anything
   editingLineIndex = null;
+
 
   // undo ll vidual changes
   document.querySelectorAll('.ocr-line-text').forEach((el) => { 
@@ -1734,7 +2281,7 @@ function stopEditingLine() {
 function highlightWordsInLine(row, words) {
   const textSpan = row.querySelector('.ocr-line-text');
   if (!textSpan) return;
-  const plain = textSpan.dataset.plain || textSpan.innerText;
+  const plain = textSpan.textContent;
   textSpan.dataset.beforeHighlight = plain;
 
   // handle both [{word, lemma}] and ['word'] formats ??
@@ -1750,14 +2297,12 @@ function highlightWordsInLine(row, words) {
 function restoreLineText(row) {
   const textSpan = row.querySelector('.ocr-line-text');
   if (!textSpan || !textSpan.dataset.beforeHighlight) return;
-  const showConfidence = confidenceCheckbox.checked;
-  textSpan.innerHTML = showConfidence ? textSpan.dataset.html : textSpan.dataset.plain;
   delete textSpan.dataset.beforeHighlight;
+  renderLineText(textSpan);
 }
 
 
-
-// just a click listenter
+// just a click listener
 document.getElementById('ocr-results').addEventListener('click', (e) => {
   // 1. was the dictionary button that was clicked?
   const dictBtn = e.target.closest('.ocr-line-dict-btn');
@@ -1784,7 +2329,6 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
       chip.className = 'matched-word-chip';
       const word = typeof item === 'string' ? item : item.word;
       const lemma = typeof item === 'object' ? item.lemma : null;
-      
       if (lemma) {
         chip.innerHTML = `${word} <span class="chip-lemma">→ ${lemma}</span>`;
       } else {
@@ -1793,38 +2337,25 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
       wordsPopup.appendChild(chip);
     });
 
-
     highlightWordsInLine(row, words);
     const btnRect = dictBtn.getBoundingClientRect();
     wordsPopup.style.display = 'flex';
-    
+
     const popupWidth = wordsPopup.offsetWidth || 300;
     const popupHeight = wordsPopup.offsetHeight || 100;
-    
+
     let left = btnRect.left;
-    if (left + popupWidth > window.innerWidth - 8) {
-      left = window.innerWidth - popupWidth - 8;
-    }
+    if (left + popupWidth > window.innerWidth - 8) left = window.innerWidth - popupWidth - 8;
     if (left < 8) left = 8;
-    
+
     let top = btnRect.top - popupHeight - 8;
     if (top < 8) top = btnRect.bottom + 8;
-    
+
     wordsPopup.style.left = left + 'px';
     wordsPopup.style.top = top + 'px';
-    
     wordsPopup.dataset.activeRow = row.dataset.lineIndex;
     return;
   }
-
-
-  // when clicked outside, close the dict popups
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
-      wordsPopup.style.display = 'none';
-      document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
-    }
-  });
 
   // 2. was it the edit button that was clicked?
   const editBtn = e.target.closest('.ocr-line-edit-btn');
@@ -1835,12 +2366,13 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
     if (isEditingOcr && editingLineIndex === lineIndex) {
       stopEditingLine();
     } else if (!isEditingOcr) {
+      if (textView === 'original') setTextView('edited');
       startEditingLine(lineIndex);
     }
     return;
   }
 
-  // 3. was the row clicked (for polugon and red highlights?)
+  // 3. was the row clicked? → highlight polygon + show its explanation
   if (isEditingOcr) return;
   const row = e.target.closest('.ocr-line-result');
   if (!row) return;
@@ -1850,13 +2382,16 @@ document.getElementById('ocr-results').addEventListener('click', (e) => {
   document.querySelectorAll('.ocr-line-result.selected').forEach(r => r.classList.remove('selected'));
   row.classList.add('selected');
   renderOverlay();
+  focusExplainItem(lineIndex);   // NEW: jump to this line's explanation
 });
 
-
-
-
-
-
+// when clicked outside, close the dict popup (registered once, outside the handler)
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.ocr-line-dict-btn') && !e.target.closest('#matched-words-popup')) {
+    wordsPopup.style.display = 'none';
+    document.querySelectorAll('.ocr-line-result').forEach(r => restoreLineText(r));
+  }
+});
 
 //////////// keyboard functions ////
 // rememebers the text box before we click the keyboard key making typing with the keyboard possible
@@ -1950,3 +2485,278 @@ document.getElementById('download-ocr-btn').addEventListener('click', () => {
 });
 
 //////////////////////////////////////////////////////////////
+////////////////////// AI panel (summary + line by line, per model) ///////////////////////
+const aiSummaryBox = document.getElementById('ai-summary');
+const aiSummaryToggle = document.getElementById('ai-summary-toggle');
+const aiTabs = document.getElementById('ai-tabs');
+const providerToggle = document.getElementById('summary-provider-toggle');
+const singleProvider = document.getElementById('summary-provider-single');
+
+const aiSummaryBtn = document.getElementById('ai-summary-btn');
+const aiSummaryText = document.getElementById('ai-summary-text');
+const aiSummaryNote = document.getElementById('ai-summary-note');
+const aiSummaryEmpty = document.getElementById('ai-summary-empty');
+
+const explainBtn = document.getElementById('ai-explain-btn');
+const explainList = document.getElementById('ai-explain-list');
+const explainNote = document.getElementById('ai-explain-note');
+const explainEmpty = document.getElementById('ai-explain-empty');
+
+// saved results per model: { qwen: { summary, explanation: { segments } }, gemini: {...} }
+let aiOutputs = {};
+try { aiOutputs = JSON.parse(document.getElementById('ai-outputs-data')?.textContent || '{}') || {}; } catch (e) {}
+
+let summaryProvider = singleProvider ? singleProvider.value : 'qwen';
+let summaryBusy = false;
+let explainBusy = false;
+
+function providerLabel(id) {
+  const btn = providerToggle && providerToggle.querySelector(`.ba-btn[data-provider="${id}"]`);
+  return btn ? btn.textContent.trim() : id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+// ---- collapse ----
+function setSummaryCollapsed(collapsed) {
+  if (!aiSummaryBox) return;
+  aiSummaryBox.classList.toggle('collapsed', collapsed);
+  if (aiSummaryToggle) {
+    aiSummaryToggle.title = collapsed ? 'Show' : 'Close';
+    aiSummaryToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+  const drawerBtn = document.getElementById('ai-drawer-btn');
+  if (drawerBtn) {
+    drawerBtn.classList.toggle('active', !collapsed);
+    drawerBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+  try { localStorage.setItem('summaryCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  layoutWorkspace();
+}
+
+// ---- tabs ----
+function setAiTab(tab) {
+  if (!aiSummaryBox || !aiTabs) return;
+  aiSummaryBox.dataset.tab = tab;
+  aiTabs.querySelectorAll('.ai-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  try { localStorage.setItem('aiTab', tab); } catch (e) {}
+}
+
+// ---- line by line ----
+function highlightLines(indices) {
+  selectedIndices = new Set(indices);
+  document.querySelectorAll('.ocr-line-result').forEach((r) => {
+    r.classList.toggle('selected', indices.includes(parseInt(r.dataset.lineIndex)));
+  });
+  const first = document.querySelector(`.ocr-line-result[data-line-index="${indices[0]}"]`);
+  if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  renderOverlay();
+}
+
+
+
+function renderExplanation(segments) {
+  if (!explainList) return;
+  explainList.innerHTML = '';
+  segments.forEach((seg) => {
+    const item = document.createElement('div');
+    item.className = 'ai-explain-item';
+
+    const badge = document.createElement('span');
+    badge.className = 'ai-explain-lines';
+    const a = seg.lines[0], b = seg.lines[seg.lines.length - 1];
+    badge.textContent = a === b ? `L${a}` : `L${a}–${b}`;
+
+    const body = document.createElement('div');
+    body.className = 'ai-explain-body';
+      [['translation', 'ai-explain-translation'], ['romanized', 'ai-explain-roman'], ['note', 'ai-explain-note']]
+      .forEach(([key, cls]) => {
+        if (!seg[key]) return;
+        const el = document.createElement('span');
+        el.className = cls;
+        el.textContent = seg[key];
+        body.appendChild(el);
+      });
+
+    item.append(badge, body);
+    item._lines = seg.line_indices || [];
+
+    item.addEventListener('click', () => {
+      explainList.querySelectorAll('.ai-explain-item.active').forEach((x) => x.classList.remove('active'));
+      item.classList.add('active');
+      highlightLines(item._lines);
+    });
+
+    // hover an explanation → light up its rows
+    item.addEventListener('mouseenter', () => {
+      item._lines.forEach((li) => {
+        document.querySelector(`.ocr-line-result[data-line-index="${li}"]`)?.classList.add('hovered');
+      });
+    });
+    item.addEventListener('mouseleave', () => {
+      document.querySelectorAll('.ocr-line-result.hovered').forEach((r) => r.classList.remove('hovered'));
+    });
+    explainList.appendChild(item);
+  });
+  explainList.hidden = segments.length === 0;
+}
+
+// a row or polygon was clicked → show its explanation in the drawer
+function focusExplainItem(lineIndex) {
+  if (!explainList || !aiSummaryBox || aiSummaryBox.classList.contains('collapsed')) return;
+  explainList.querySelectorAll('.ai-explain-item.active').forEach((x) => x.classList.remove('active'));
+  const item = [...explainList.children].find((el) => (el._lines || []).includes(lineIndex));
+  if (!item) return;
+  if (aiSummaryBox.dataset.tab !== 'explain') setAiTab('explain');
+  item.classList.add('active');
+  item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ---- show the selected model's results (or an empty state) ----
+function renderAiOutputs() {
+  const out = aiOutputs[summaryProvider] || {};
+  const label = providerLabel(summaryProvider);
+
+  const summary = out.summary || '';
+  if (aiSummaryText) { aiSummaryText.textContent = summary; aiSummaryText.hidden = !summary; }
+  if (aiSummaryNote) {
+    aiSummaryNote.hidden = !summary;
+    aiSummaryNote.textContent = out.summary_stale
+      ? `⚠ The transcription was edited after this summary was generated. Click Regenerate to update it.`
+      : `Generated by ${label} from the transcription. It may contain mistakes.`;
+    aiSummaryNote.classList.toggle('is-stale', !!out.summary_stale);   // NEW
+  }
+  if (aiSummaryEmpty) aiSummaryEmpty.textContent = `No summary from ${label} yet. Click Summarize to create one.`;
+  if (aiSummaryBtn && !summaryBusy) aiSummaryBtn.textContent = summary ? 'Regenerate' : 'Summarize';
+
+  const segments = (out.explanation && out.explanation.segments) || [];
+  renderExplanation(segments);
+  if (explainNote) {
+    explainNote.hidden = segments.length === 0;
+    explainNote.textContent = out.explanation_stale
+      ? `⚠ The transcription was edited after this was generated. Click Regenerate to update it.`
+      : `Generated by ${label} from the transcription. Check it against the original.`;
+    explainNote.classList.toggle('is-stale', !!out.explanation_stale);   // NEW
+  }
+  if (explainEmpty) explainEmpty.textContent = `No line-by-line reading from ${label} yet. Click Explain to create one.`;
+  if (explainBtn && !explainBusy) explainBtn.textContent = segments.length ? 'Regenerate' : 'Explain';
+}
+
+function setSummaryProvider(id) {
+  if (providerToggle && !providerToggle.querySelector(`.ba-btn[data-provider="${id}"]`)) return;
+  summaryProvider = id;
+  if (providerToggle) {
+    providerToggle.querySelectorAll('.ba-btn').forEach((b) => b.classList.toggle('active', b.dataset.provider === id));
+  }
+  try { localStorage.setItem('summaryProvider', id); } catch (e) {}
+  renderAiOutputs();
+}
+
+// ---- generate (summary or explanation) for the selected model ----
+function runAi(kind) {
+  const isSummary = kind === 'summary';
+  const btn = isSummary ? aiSummaryBtn : explainBtn;
+  const provider = summaryProvider;   // remembered, in case the user switches while waiting
+
+  if (isSummary) summaryBusy = true; else explainBusy = true;
+  btn.disabled = true;
+  btn.textContent = isSummary ? 'Summarizing…' : 'Explaining…';
+
+  const body = new FormData();
+  body.append('provider', provider);
+
+  fetch(`/${isSummary ? 'summarize' : 'explain'}/${currentDocId}/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    body,
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (!data.success) {
+        alert(data.error || 'The model returned an empty answer.');
+        return;
+      }
+      const out = aiOutputs[provider] || (aiOutputs[provider] = {});
+      if (isSummary) { out.summary = data.summary; out.summary_stale = false; }
+      else { out.explanation = { segments: data.segments || [] }; out.explanation_stale = false; }
+      setSummaryCollapsed(false);
+    })
+    .catch(() => alert('Could not reach the server.'))
+    .finally(() => {
+      if (isSummary) summaryBusy = false; else explainBusy = false;
+      btn.disabled = false;
+      renderAiOutputs();
+    });
+}
+
+// ---- init ----
+setSummaryCollapsed(true);  
+
+aiSummaryToggle?.addEventListener('click', () => setSummaryCollapsed(true));
+document.getElementById('ai-drawer-btn')?.addEventListener('click', () => {
+  setSummaryCollapsed(!aiSummaryBox.classList.contains('collapsed'));
+});
+
+if (aiTabs) {
+  try { setAiTab(localStorage.getItem('aiTab') || 'summary'); } catch (e) {}
+  aiTabs.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ai-tab');
+    if (!btn) return;
+    setAiTab(btn.dataset.tab);
+    setSummaryCollapsed(false);
+  });
+}
+
+if (providerToggle) {
+  let saved = null;
+  try { saved = localStorage.getItem('summaryProvider'); } catch (e) {}
+  const first = providerToggle.querySelector('.ba-btn');
+  if (!(saved && providerToggle.querySelector(`.ba-btn[data-provider="${saved}"]`))) {
+    saved = first ? first.dataset.provider : summaryProvider;
+  }
+  providerToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ba-btn');
+    if (btn) setSummaryProvider(btn.dataset.provider);
+  });
+  setSummaryProvider(saved);
+} else {
+  renderAiOutputs();
+}
+
+aiSummaryBtn?.addEventListener('click', () => runAi('summary'));
+explainBtn?.addEventListener('click', () => runAi('explain'));
+
+// ---- resizable AI drawer (drag its left edge) ----
+const aiResizeHandle = document.getElementById('ai-resize-handle');
+const AI_MIN_W = 260, AI_MAX_W = 720, AI_DEFAULT_W = 340;
+
+if (aiResizeHandle && aiSummaryBox) {
+  aiResizeHandle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = aiDrawerWidth;
+    aiResizeHandle.setPointerCapture(e.pointerId);
+    aiResizeHandle.classList.add('dragging');
+    workspace.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+
+    const onMove = (ev) => {   // drag left = wider
+      aiDrawerWidth = Math.round(Math.min(Math.max(startW + (startX - ev.clientX), AI_MIN_W), AI_MAX_W));
+      layoutWorkspace();
+    };
+    const onUp = () => {
+      aiResizeHandle.removeEventListener('pointermove', onMove);
+      aiResizeHandle.removeEventListener('pointerup', onUp);
+      aiResizeHandle.classList.remove('dragging');
+      workspace.classList.remove('resizing');
+      document.body.style.cursor = '';
+      try { localStorage.setItem('aiDrawerWidth', aiDrawerWidth); } catch (e) {}
+    };
+    aiResizeHandle.addEventListener('pointermove', onMove);
+    aiResizeHandle.addEventListener('pointerup', onUp);
+  });
+
+  aiResizeHandle.addEventListener('dblclick', () => {   // double-click = default width
+    aiDrawerWidth = AI_DEFAULT_W;
+    layoutWorkspace();
+    try { localStorage.removeItem('aiDrawerWidth'); } catch (e) {}
+  });
+}

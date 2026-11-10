@@ -36,6 +36,10 @@ class UploadedImage(models.Model):
     ocr_stale = models.BooleanField(default=False)
     line_padding = models.JSONField(default=dict, blank=True)
 
+    ai_summary = models.TextField(blank=True, default='')
+    ai_explanation = models.JSONField(default=dict, blank=True)
+    ai_outputs = models.JSONField(default=dict, blank=True)
+
     @property
     def filename(self):
         return os.path.basename(self.original_image.name)

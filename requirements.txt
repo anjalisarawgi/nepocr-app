@@ -15,3 +15,5 @@ python-dotenv
 psycopg2-binary
 gunicorn
 whitenoise
+paddleocr==3.7.0
+paddlepaddle

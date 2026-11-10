@@ -24,7 +24,16 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
-      <span class="sidebar-heading">My documents</span>
+            <div class="sidebar-head">
+        <span class="sidebar-heading">My documents</span>
+        <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="Collapse documents" aria-expanded="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <line x1="9" y1="4" x2="9" y2="20"/>
+            <polyline points="16 10 14 12 16 14"/>
+          </svg>
+        </button>
+      </div>
       
       <div class="doc-list">
         {% for doc in documents %}
@@ -114,6 +123,7 @@
           
 
           <div class="overlay-toggle-group" id="overlay-toggle-group" style="display:none;">
+            <span class="seg-source-tag" id="seg-source-tag" style="display:none;"></span>
             <label class="overlay-toggle">
               <input type="checkbox" id="show-polygons-checkbox" checked>
               <span>Polygons</span>
@@ -174,11 +184,12 @@
               <line x1="12" y1="17" x2="12" y2="17.01"/>
             </svg>
           </button>
-        
+          {% if selected_doc.status == 'uploaded' %}
           <button id="next-step-btn" class="btn-next-bar" {% if selected_doc.status != 'uploaded' %}disabled{% endif %}>
             Next:
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </button>
+          {% endif %}
         </div>
 
         <span id="preview-placeholder" style="display: {% if selected_doc %}none{% else %}block{% endif %};">Preview</span>
@@ -195,7 +206,7 @@
             <div class="crop-handle" data-corner="se"></div>
           </div>
         </div>
-        <svg id="line-overlay" style="position:absolute; top:38px; left:0; width:100%; height:calc(100% - 38px); display:none; pointer-events:none;"></svg>
+        <svg id="line-overlay" style="position:absolute; top:var(--bar-h); left:0; width:100%; height:calc(100% - var(--bar-h)); display:none; pointer-events:none;"></svg>
         <div id="selection-box" class="selection-box" style="display:none;"></div>
 
         <div id="readonly-toast" class="readonly-toast" style="display:none;">
@@ -247,7 +258,7 @@
 
 
           <div class="accordion-header">
-            <span class="accordion-title">Step 1: Image Cleaning</span>
+            <span class="accordion-title">Preprocessing</span>
           
             <button type="button" class="info-btn" data-info-step="1" title="What do these options do?">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -349,7 +360,7 @@
         <div class="accordion-section {% if selected_doc.status == 'segmented' %}active-step open{% elif selected_doc.status == 'ocr_done' %}locked done{% else %}locked{% endif %}" data-section="Segmentation">
 
           <div class="accordion-header">
-            <span class="accordion-title">Step 2: Line Segmentation</span>
+            <span class="accordion-title">Segmentation</span>
             <button type="button" class="info-btn" data-info-step="2" title="What does this step do?">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
@@ -369,12 +380,47 @@
             <div class="accordion-body">
               <div class="accordion-body-inner">
                 <!-- <p class="placeholder-text">Automatically detect individual text lines using a trained baseline model.</p> -->
-                <p class="credit-text">Model used: <strong>Kraken (blla.model)</strong>, with designing fully inspired from <strong>eScriptorium</strong></a>.</p>
-
+                
+<!--                 
                 <p class="placeholder-text">Click <strong>Run Segmentaiton</strong> to automatically detect lines. You can also edit the segmentations if required.</p>
 
+                <div class="seg-engine">
+                <span class="seg-engine-label">Line detection model</span>
+                <div class="before-after-toggle" id="seg-engine-toggle">
+                  <button type="button" class="ba-btn active" data-engine="kraken">Kraken</button>
+                  <button type="button" class="ba-btn" data-engine="paddle">PaddleOCR</button>
+                </div>
+              </div>
 
-                <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run Segmentation</button>
+              <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run Segmentation</button> -->
+
+              <p class="placeholder-text">Choose how to detect text lines. You can edit the result afterwards.</p>
+
+              <div class="engine-cards" id="seg-engine-toggle" role="radiogroup" aria-label="Line detection model">
+                <button type="button" class="engine-card" data-engine="kraken" role="radio" aria-checked="true">
+                  <span class="engine-radio"></span>
+                  <span class="engine-text">
+                    <span class="engine-name">Kraken <span class="engine-tag">Recommended</span></span>
+                    <span class="engine-desc">Full lines with baselines. Best for handwritten manuscripts.</span>
+                  </span>
+                </button>
+
+                <button type="button" class="engine-card" data-engine="paddle" role="radio" aria-checked="false">
+                  <span class="engine-radio"></span>
+                  <span class="engine-text">
+                    <span class="engine-name">PaddleOCR</span>
+                    <span class="engine-desc">Text boxes, no baselines. Good for printed pages and newspapers.</span>
+                  </span>
+                </button>
+              </div>
+
+              <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run Kraken segmentation</button>
+
+              <!-- <p class="engine-credit">Kraken blla · PaddleOCR PP-OCRv5 · editing inspired by eScriptorium</p> -->
+          <p class="engine-credit">Designing fully inspired from <a href="https://escriptorium.inria.fr" target="_blank" rel="noopener">eScriptorium</a></p>
+
+
+                <!-- <button class="btn-secondary" type="button" id="run-segmentation-model-btn">Run Segmentation</button> -->
 
                 <div class="padding-controls" id="padding-controls" style="display:none;">
                   <p class="placeholder-text" style="margin-bottom:4px;">Select a polygon, then adjust its padding:</p>
@@ -425,7 +471,7 @@
         <div class="accordion-section {% if selected_doc.status == 'ocr_done' %}active-step open{% else %}locked{% endif %}" data-section="ocr">
 
           <div class="accordion-header">
-            <span class="accordion-title">Step 3: Run OCR</span>
+            <span class="accordion-title">HTR/OCR</span>
 
             <button type="button" class="info-btn" data-info-step="3" title="What does this step do?">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -441,10 +487,13 @@
           <div class="accordion-body-wrap">
             <div class="accordion-body">
               <div class="accordion-body-inner">
-                <p class="placeholder-text">Click the <strong>Run OCR</strong> button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. To make changes, please go back to the previous step.</p>
-              
+                <!-- <p class="placeholder-text">Click the <strong>Run OCR</strong> button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. To make changes, please go back to the previous step.</p> -->
+              {% if not selected_doc.ocr_predictions %}
+              <p class="placeholder-text" id="ocr-intro">Please click the <strong>Run OCR</strong> button to automatically transcribe the lines. Please note that the lines segmented are predicted line by line, and the sections unsegmented cannot be predicted. To make changes, please go back to the previous step.</p>
+        
+              {% endif %}
                 <div class="ocr-action-zone">
-                  <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
+                  <!-- <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button> -->
               
                   <div id="ocr-stale-warning" class="ocr-stale-warning" style="display: {% if selected_doc.ocr_stale %}flex{% else %}none{% endif %};">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -457,65 +506,123 @@
                 </div>
               
                 <div class="ocr-results-panel" id="ocr-results-panel" style="display: {% if selected_doc.ocr_predictions %}flex{% else %}none{% endif %};">
-                  <div class="ocr-results-header">
-                    <span class="ocr-results-title">Model Transcription</span>
-                    <!-- <button type="button" id="toggle-matched-words-btn" class="overlay-toggle" style="font-size:11.5px; background:none; border:none; cursor:pointer; color:var(--ink-soft);">
-                      Show matched words
-                    </button> -->
-                    <label class="overlay-toggle" id="confidence-toggle-row">
-                      <input type="checkbox" id="show-confidence-checkbox">
-                      <span>Show model confidence</span>
-                    </label>
-                  </div>
-              
-                  <div id="ocr-results" class="ocr-results">
-                    {% if selected_doc.ocr_predictions %}
-                      {% for pred in selected_doc.ocr_predictions %}
-                      <div class="ocr-line-result" data-line-index="{{ pred.line_index }}" data-matched-words="{{ pred.matched_words_json|default:'[]' }}">
-                        <span class="ocr-line-number">{{ forloop.counter }}</span>
-                        <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}">{{ pred.html|safe }}</span>
-                        
-                        <button type="button" class="ocr-line-dict-btn" title="Show matched words"
-                          {% if not pred.matched_words %}style="display:none;"{% endif %}>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  <div class="ocr-split">
+
+                    <!-- LEFT: header + transcription -->
+                    <div class="ocr-col">
+                      <div class="ocr-results-header">
+                        <span class="ocr-results-title">Model Transcription</span>
+                        <div class="ocr-header-actions">
+                          <div class="before-after-toggle" id="text-view-toggle">
+                            <button type="button" class="ba-btn" data-view="original">Original</button>
+                            <button type="button" class="ba-btn active" data-view="edited">Edited</button>
+                          </div>
+                          <label class="overlay-toggle" id="confidence-toggle-row">
+                            <input type="checkbox" id="show-confidence-checkbox" autocomplete="off">
+                            <span>Model confidence</span>
+                          </label>
+                          <button type="button" class="ocr-icon-btn" id="download-ocr-btn" title="Download transcription (.txt)" aria-label="Download transcription">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                              <polyline points="7 10 12 15 17 10"/>
+                              <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                          </button>
+                          <button type="button" id="ai-drawer-btn" class="ocr-icon-btn ai-drawer-btn" title="AI summary & line-by-line reading" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
+                            </svg>
+                            <span>AI</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div id="ocr-results" class="ocr-results">
+                        {% if selected_doc.ocr_predictions %}
+                          {% for pred in selected_doc.ocr_predictions %}
+                          <div class="ocr-line-result" data-line-index="{{ pred.line_index }}" data-confidence="{{ pred.confidence|default:'' }}" data-char-conf="{{ pred.char_conf_json|default:'[]' }}" data-matched-words="{{ pred.matched_words_json|default:'[]' }}">
+                            <span class="ocr-line-number">{{ forloop.counter }}</span>
+                            <span class="ocr-line-text" data-html="{{ pred.html }}" data-plain="{{ pred.text }}" data-original="{{ pred.original_text|default:pred.text }}">{{ pred.html|safe }}</span>
+                            <button type="button" class="ocr-line-dict-btn" title="Show matched words" {% if not pred.matched_words %}style="display:none;"{% endif %}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                              </svg>
+                            </button>
+                            <button type="button" class="ocr-line-edit-btn" title="Edit this line">
+                              <svg class="icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"/>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                              </svg>
+                              <svg class="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            </button>
+                          </div>
+                          {% endfor %}
+                        {% endif %}
+                      </div>
+                    </div>
+
+                    <!-- RIGHT: AI drawer = header row + box (content + footer) -->
+                    <div class="ai-summary ai-drawer collapsed" id="ai-summary" data-tab="summary">
+                      <div class="ai-resize-handle" id="ai-resize-handle" title="Drag to resize · double-click to reset"></div>
+
+                      <div class="ai-summary-head">
+                        <span class="ai-drawer-label">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
                           </svg>
-                        </button>
-                    
-                        <button type="button" class="ocr-line-edit-btn" title="Edit this line">
-                          <svg class="icon-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 20h9"/>
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                          </svg>
-                          <svg class="icon-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
+                          AI
+                        </span>
+                        <div class="ai-tabs" id="ai-tabs">
+                          <button type="button" class="ai-tab active" data-tab="summary">Summary</button>
+                          <button type="button" class="ai-tab" data-tab="explain">Line by line</button>
+                        </div>
+                        <button type="button" class="ai-summary-close" id="ai-summary-toggle" title="Close AI panel" aria-expanded="false">
+                          <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                       </div>
-                    {% endfor %}
-                    {% endif %}
-                  </div>
-              
-                  {% if selected_doc %}
-                <button type="button" class="btn-download-txt" id="download-ocr-btn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="11" x2="12" y2="17"/>
-                    <polyline points="9 14 12 17 15 14"/>
-                  </svg>
-                  Download transcription (.txt)
-                </button>
-                  
-                  
-                  {% endif %}
-                </div>
-              
 
-                <div class="step-nav-row">
-                  <button class="btn-primary" type="button" id="back-to-segmentation-btn">← Previous Step</button>
+                      <div class="ai-drawer-box">
+                        <div class="ai-pane ai-pane-summary">
+                          <p class="ai-summary-text" id="ai-summary-text" hidden></p>
+                          <span class="ai-summary-note" id="ai-summary-note" hidden></span>
+                          <p class="ai-empty" id="ai-summary-empty"></p>
+                        </div>
+
+                        <div class="ai-pane ai-pane-explain">
+                          <div class="ai-explain-list" id="ai-explain-list" hidden></div>
+                          <span class="ai-summary-note" id="ai-explain-note" hidden></span>
+                          <p class="ai-empty" id="ai-explain-empty"></p>
+                        </div>
+
+                        <div class="ai-toolbar">
+                          {% if summary_providers|length > 1 %}
+                          <div class="before-after-toggle" id="summary-provider-toggle">
+                            {% for p in summary_providers %}
+                            <button type="button" class="ba-btn{% if forloop.first %} active{% endif %}" data-provider="{{ p.id }}">{{ p.label }}</button>
+                            {% endfor %}
+                          </div>
+                          {% elif summary_providers %}
+                          <input type="hidden" id="summary-provider-single" value="{{ summary_providers.0.id }}">
+                          {% endif %}
+                          <button type="button" class="ai-summary-btn" id="ai-summary-btn">Summarize</button>
+                          <button type="button" class="ai-summary-btn" id="ai-explain-btn">Explain</button>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                  {{ selected_doc.ai_outputs|json_script:"ai-outputs-data" }}
                 </div>
+
+
+
+              <div class="step-nav-row">
+                <button class="btn-primary" type="button" id="back-to-segmentation-btn">← Previous Step</button>
+                <button class="btn-secondary" type="button" id="run-ocr-btn">Run OCR</button>
+              </div>
               </div>
             </div>
           </div>

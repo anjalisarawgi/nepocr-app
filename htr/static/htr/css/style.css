@@ -57,7 +57,7 @@ nav {
 
 .workspace {
   display: grid;
-  grid-template-columns: 280px 6px 1fr 6px 550px;
+  grid-template-columns: 220px 6px 1fr 6px 550px;
   height: calc(100vh - 40px);
 }
 
@@ -890,31 +890,48 @@ nav {
 .ocr-results {
   display: flex;
   flex-direction: column;
-  gap: 0.5px;
-  margin-top: 0px;
+  gap: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  overflow: hidden;
 }
 .ocr-line-result {
   display: flex;
-  gap: 10px;
-  padding: 2px 10px;
-  background: var(--panel-bg);
-  border-radius: 1px;
-  font-size: 15px;
+  align-items: stretch;
+  padding: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.ocr-line-result:last-child {
+  border-bottom: none;
 }
 .ocr-line-number {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  background: var(--panel-bg);
   color: var(--ink-faint);
+  font-size: 12px;
   font-weight: 600;
-  flex: 0 0 auto;
-  width: 20px;
-  align-self: flex-start;
 }
 .ocr-line-text {
   flex: 1;
   min-width: 0;
+  align-self: center;
+  padding: 6px 12px;
   overflow-wrap: anywhere;
   word-break: break-word;
-  white-space: normal;
 }
+.ocr-line-dict-btn,
+.ocr-line-edit-btn {
+  align-self: center;
+  margin-right: 6px;
+}
+
 
 
 .ocr-token { cursor: help; position: relative; display: inline; text-decoration: underline; text-decoration-thickness: 2px; }
@@ -1192,6 +1209,10 @@ nav {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.ocr-line-result.selected .ocr-line-number {
+  color: var(--accent);
+}
+
 .info-btn {
   display: flex;
   align-items: center;
@@ -1294,7 +1315,8 @@ nav {
 
 .ocr-line-result.editing-row {
   background: var(--panel-bg);
-  border-left: 3px solid var(--accent);
+  /* border-left: 3px solid var(--accent); */
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 
@@ -1550,3 +1572,1161 @@ mark.dict-highlight {
 .matched-word-chip::after {
   display: none;
 }
+
+
+
+
+
+/* 3. Remove the box around the transcription (the table has its own border) */
+.ocr-results-panel {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* Header actions: confidence toggle + small download button */
+.ocr-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ocr-results-header .btn-download-txt {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+.ocr-results-header .btn-download-txt svg {
+  width: 13px;
+  height: 13px;
+}
+
+
+/* 5. Smaller bottom buttons in the OCR step */
+.accordion-section[data-section="ocr"] .step-nav-row .btn-primary,
+.accordion-section[data-section="ocr"] .step-nav-row .btn-secondary {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.ocr-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ocr-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.ocr-icon-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.ocr-icon-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ===== Steps as tabs instead of stacked accordion ===== */
+.right-col { overflow: hidden; }
+
+.accordion {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.accordion-section { display: contents; }
+
+/* Tab headers in one row */
+.accordion-header {
+  grid-row: 1;
+  min-width: 0;
+  gap: 6px;
+  padding: 12px;
+  justify-content: center;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--line);
+}
+.accordion-section:nth-child(1) .accordion-header { grid-column: 1; }
+.accordion-section:nth-child(2) .accordion-header { grid-column: 2; }
+.accordion-section:nth-child(3) .accordion-header { grid-column: 3; }
+.accordion-section + .accordion-section .accordion-header {
+  border-left: 1px solid var(--line);
+}
+
+.accordion-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.accordion-chevron { display: none; }
+.accordion-header .info-btn { margin-right: 0; padding: 2px; }
+.accordion-header .info-btn svg { width: 15px; height: 15px; }
+
+/* "Done" badge becomes just a green tick */
+.accordion-header .step-done-badge {
+  margin: 0;
+  padding: 3px;
+  font-size: 0;
+}
+
+/* Active tab */
+.accordion-section.open .accordion-header,
+.accordion-section.open .accordion-header:hover {
+  background: var(--bg);
+  border-bottom: 2px solid var(--accent);
+}
+.accordion-section.open .accordion-title { color: var(--ink); }
+.accordion-section.locked:hover .accordion-header { background: var(--panel-bg); }
+
+/* Only the active step's content shows, below the tabs */
+.accordion-body-wrap {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-height: 0;
+  display: none;
+}
+.accordion-section.open .accordion-body-wrap {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+.accordion-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+.accordion-body-inner { padding: 16px 20px 20px; }
+
+/* OCR tab: only the line list scrolls */
+.accordion-section[data-section="ocr"] .accordion-body { overflow: hidden; }
+.accordion-section[data-section="ocr"] .accordion-body-inner {
+  height: 100%;
+  min-height: 0;
+}
+.ocr-results-panel { flex: 1; min-height: 0; }
+.ocr-results { flex: 1; min-height: 0; overflow-y: auto; }
+
+/* ===== Tab polish ===== */
+
+/* Step number circle before each title (1, 2, 3) */
+.accordion { counter-reset: step; }
+.accordion-header {
+  counter-increment: step;   /* count on the tab, which is never hidden */
+  height: 38px;              /* same height as the preview bar */
+  padding: 0 12px;
+}
+
+
+.accordion-title::before {
+  /* counter-increment: step; */
+  content: counter(step);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  vertical-align: 1px;
+}
+.accordion-section.open .accordion-title::before {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+/* Done steps: light-brown number circle + small plain green tick at the end */
+.accordion-section.done .accordion-title { color: #5F5F5F; }
+
+.accordion-section.done .accordion-header .accordion-title::before {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+.accordion-section.done .accordion-header .step-done-badge {
+  order: 2;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin-left: 2px;
+  background: none;
+}
+.accordion-section.done .accordion-header .step-done-badge svg {
+  width: 13px;
+  height: 13px;
+  color: var(--success);
+}
+
+/* "?" only on the active tab */
+.accordion-section:not(.open) .accordion-header .info-btn { display: none; }
+
+/* Remove the empty gap above "Model Transcription" */
+.ocr-action-zone { display: contents; }
+.accordion-section[data-section="ocr"] .accordion-body-inner {
+  padding-top: 12px;
+  gap: 10px;
+}
+
+/* Previous Step = light secondary button, main action stays solid */
+#back-to-preprocessing-btn,
+#back-to-segmentation-btn {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 8px 18px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+}
+#back-to-preprocessing-btn:hover,
+#back-to-segmentation-btn:hover {
+  background: var(--panel-bg);
+  border-color: var(--ink-faint);
+}
+
+.step-nav-row #run-ocr-btn,
+.step-nav-row #advance-to-ocr-btn {
+  flex: 1;
+  width: auto;
+  min-width: 120px;
+}
+
+/* Align bottom buttons with the zoom toolbar in the preview */
+.accordion-body-inner {
+  padding-bottom: 16px;
+}
+.step-nav-row .btn-primary,
+.step-nav-row .btn-secondary {
+  height: 38px;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* User edits */
+.edit-ins {
+  color: #1D4ED8;
+  background: rgba(29, 78, 216, 0.10);
+  border-radius: 2px;
+}
+.edit-del {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin: 0 1px;
+  background: #DC2626;
+  vertical-align: -0.15em;
+  cursor: help;
+}
+.ocr-line-result.is-edited .ocr-line-number {
+  color: #1D4ED8;
+}
+.ocr-header-actions .before-after-toggle { margin-right: 0; }
+/* Model confidence: coloured blocks behind uncertain parts of a line */
+.ocr-line-result { position: relative; }
+.ocr-line-text { position: relative; z-index: 1; }
+.conf-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.conf-box { position: absolute; border-radius: 3px; }
+.conf-box.mid  { background: rgba(234, 179, 8, 0.22); }
+.conf-box.low  { background: rgba(249, 115, 22, 0.22); }
+.conf-box.vlow { background: rgba(220, 38, 38, 0.20); }
+
+
+/* Confidence tooltip */
+.conf-tooltip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--canvas-bg);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.conf-tooltip-head {
+  color: #F1F1F1;
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.conf-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.conf-tooltip-row span:first-child { font-size: 14px; }
+.conf-tooltip-head + .conf-tooltip-row {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.ocr-results .ocr-line-result.hovered {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.ocr-line-result.hovered .ocr-line-number {
+  color: var(--accent);
+}
+
+
+/* Segmentation edit handles */
+.overlay-handle {
+  cursor: grab;
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+.overlay-handle:active { cursor: grabbing; }
+
+.overlay-handle.vertex {
+  fill: #FFFFFF;
+  stroke: #A8512E;
+}
+.overlay-handle.vertex:hover { fill: #A8512E; }
+
+.overlay-handle.baseline-pt {
+  fill: #9F1239;
+  stroke: #FFFFFF;
+}
+.overlay-handle.baseline-pt:hover {
+  fill: #FFFFFF;
+  stroke: #9F1239;
+}
+
+
+/* Segmentation model cards */
+.engine-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.engine-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.engine-card:hover { border-color: var(--ink-faint); }
+.engine-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.engine-radio {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--bg);
+  position: relative;
+}
+.engine-card.active .engine-radio { border-color: var(--accent); }
+.engine-card.active .engine-radio::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.engine-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.engine-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.engine-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--success);
+  background: var(--success-soft);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.engine-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.engine-credit {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+/* Which model the segmentation came from */
+.seg-source-tag {
+  align-items: center;
+  align-self: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+
+/* Narrower, tighter sidebar */
+.sidebar {
+  padding: 16px 10px;
+  gap: 12px;
+}
+.sidebar-heading {
+  font-size: 11px;
+  padding: 0 6px;
+}
+.doc-item {
+  padding: 7px 6px;
+  gap: 7px;
+}
+.doc-name { font-size: 12.5px; }
+.doc-updated { font-size: 10px; }
+.doc-icon { width: 13px; height: 13px; }
+
+
+/* ===== Compact preview bar (and matching step tabs) ===== */
+:root { --bar-h: 32px; }
+
+.preview-bar {
+  height: var(--bar-h);
+  padding: 0 12px;
+  gap: 6px;
+}
+.preview-card { padding-top: var(--bar-h); }
+.accordion-header { height: var(--bar-h); }     /* tabs stay aligned with the bar */
+
+/* even spacing via gap instead of each item's own margin */
+.preview-bar > * { margin-right: 0; }
+
+/* text */
+#preview-filename { font-size: 10px; }
+.preview-last-updated { font-size: 10px; }
+.preview-last-updated svg { width: 10px; height: 10px; }
+.overlay-toggle-group { gap: 8px; }
+.overlay-toggle { font-size: 11px; gap: 4px; }
+.preview-bar .overlay-toggle input[type="checkbox"] { width: 12px; height: 12px; }
+
+/* icon buttons */
+.btn-download-image,
+.btn-draw-baseline,
+.btn-bar-action {
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.btn-download-image svg,
+.btn-draw-baseline svg,
+.btn-bar-action svg { width: 13px; height: 13px; }
+.preview-bar .info-btn svg { width: 15px; height: 15px; }
+
+/* before / after switch */
+.preview-bar .before-after-toggle { padding: 2px; border-radius: 6px; }
+.preview-bar .ba-btn { font-size: 11px; padding: 3px 8px; }
+
+/* delete + next buttons */
+.btn-delete-line { font-size: 11px; padding: 3px 8px; border-radius: 6px; }
+.btn-delete-line svg { width: 12px; height: 12px; }
+.btn-next-bar { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; }
+.btn-next-bar svg { width: 12px; height: 12px; }
+
+/* step tabs: slightly smaller text to match */
+.accordion-title { font-size: 12.5px; }
+
+/* Devanagari font for transcriptions, with room for matras above and below */
+.ocr-line-text,
+.conf-tooltip-row span:first-child,
+.matched-word-chip {
+  font-family: 'Noto Sans Devanagari', var(--sans);
+}
+.ocr-line-result { line-height: 1.7; }
+
+
+
+/* AI summary card */
+.ai-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+}
+.ai-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-summary-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.ai-summary-title svg { width: 14px; height: 14px; }
+.ai-summary-btn {
+  padding: 3px 10px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ai-summary-btn:hover { border-color: var(--accent); color: var(--accent); }
+.ai-summary-btn:disabled { color: var(--ink-faint); cursor: wait; }
+.ai-summary-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.ai-summary-note {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.ai-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-summary-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8a8580;
+  cursor: pointer;
+}
+.ai-summary-close:hover { background: rgba(0, 0, 0, 0.06); color: #333; }
+.ai-summary-close[hidden] { display: none; }   /* display:inline-flex would otherwise override [hidden] */
+.ai-summary-close svg { width: 16px; height: 16px; }
+
+.ai-summary-close .icon-open { display: none; }
+.ai-summary.collapsed .ai-summary-close .icon-close { display: none; }
+.ai-summary.collapsed .ai-summary-close .icon-open { display: block; }
+
+.ai-summary.collapsed .ai-summary-text,
+.ai-summary.collapsed .ai-summary-note { display: none; }
+
+.ai-summary-actions { display: flex; align-items: center; gap: 8px; }
+
+.ai-summary-text { white-space: pre-line; }
+
+
+/* Line-by-line explanation */
+.ai-explain-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.ai-explain-list[hidden] { display: none; }
+.ai-summary.collapsed .ai-explain-list { display: none; }
+
+.ai-explain-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ai-explain-item:first-child { border-top: none; }
+.ai-explain-item:hover { background: var(--bg); }
+.ai-explain-item.active { background: var(--accent-soft); }
+
+.ai-explain-lines {
+  flex: 0 0 40px;
+  padding-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.ai-explain-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ai-explain-reading {
+  font-family: 'Noto Sans Devanagari', var(--sans);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.ai-explain-translation {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.ai-explain-note {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* One AI card with tabs */
+.ai-tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: 6px;
+  margin-right: auto;
+}
+.ai-tab {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.ai-tab:hover { color: var(--ink); background: rgba(0, 0, 0, 0.04); }
+.ai-tab.active { color: var(--accent); background: var(--accent-soft); }
+
+.ai-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-toolbar-label { font-size: 11px; color: var(--ink-faint); }
+.ai-toolbar .before-after-toggle { margin-right: 0; }
+.ai-toolbar .ai-summary-btn { margin-left: auto; }
+
+/* show only the active tab's button and content */
+.ai-summary[data-tab="summary"] #ai-explain-btn,
+.ai-summary[data-tab="explain"] #ai-summary-btn,
+.ai-summary[data-tab="summary"] .ai-pane-explain,
+.ai-summary[data-tab="explain"] .ai-pane-summary { display: none; }
+
+.ai-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-empty {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+.ai-summary-text:not([hidden]) ~ .ai-empty,
+.ai-explain-list:not([hidden]) ~ .ai-empty { display: none; }
+
+.ai-summary.collapsed .ai-toolbar,
+.ai-summary.collapsed .ai-pane { display: none; }
+
+/* no blue ring after a mouse click (keyboard focus still shows it) */
+.ai-summary-close:focus:not(:focus-visible),
+.ai-tab:focus:not(:focus-visible) { outline: none; }
+
+
+
+/* ===== AI drawer beside the transcription ===== */
+.workspace { transition: grid-template-columns 0.25s ease; }
+.workspace.resizing,
+.workspace.resizing .ai-drawer { transition: none; }
+
+.ocr-split {
+  --ai-w: 340px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+.ocr-split .ocr-results { flex: 1 1 auto; min-width: 0; }
+
+.ai-summary.ai-drawer {
+  position: relative;
+  flex: 0 0 var(--ai-w);
+  width: var(--ai-w);
+  margin-left: 10px;
+  padding: 10px 14px;
+  gap: 8px;
+  background: var(--panel-bg);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  overflow: hidden;
+  transition: flex-basis 0.25s ease, width 0.25s ease, margin 0.25s ease,
+              padding 0.25s ease, opacity 0.2s ease;
+}
+
+/* keep the content at full width while the drawer slides, so nothing reflows */
+.ai-drawer > :not(.ai-resize-handle) { min-width: calc(var(--ai-w) - 32px); }
+
+/* closed = slid away */
+.ai-summary.ai-drawer.collapsed {
+  flex-basis: 0;
+  width: 0;
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* content fills the drawer height and scrolls inside it */
+.ai-drawer .ai-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ai-drawer .ai-explain-list { max-height: none; overflow: visible; }
+
+/* resize grip on the drawer's left edge */
+.ai-drawer .ai-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: auto;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.ai-drawer .ai-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 4px;
+  height: 36px;
+  margin-top: -18px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  transition: background 0.15s ease;
+}
+.ai-drawer .ai-resize-handle:hover::after,
+.ai-drawer .ai-resize-handle.dragging::after { background: var(--accent); }
+
+/* header button */
+.ocr-icon-btn.ai-drawer-btn {
+  width: auto;
+  padding: 0 9px;
+  gap: 5px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ai-drawer-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ocr-results:empty,
+.ocr-results[style*="height: 0"] { border: none; }
+
+
+/* Line by line: keep everything inside the card, aligned under the text column */
+.ai-explain-item {
+  align-items: flex-start;
+}
+.ai-explain-body {
+  flex: 1 1 auto;          /* take the remaining width next to the L-number */
+  min-width: 0;            /* allow it to be narrower than its longest line */
+}
+.ai-explain-reading,
+.ai-explain-translation,
+.ai-explain-note {
+  overflow-wrap: anywhere; /* break long unspaced Devanagari lines */
+  word-break: break-word;
+}
+.ai-explain-list,
+.ai-summary.sized .ai-pane {
+  overflow-x: hidden;      /* never scroll sideways */
+}
+
+/* parts of one character side by side (e.g. ष | ◌ु) */
+.conf-tooltip-cols {
+  display: flex;
+  gap: 12px;
+}
+.conf-tooltip-col {
+  min-width: 96px;
+}
+.conf-tooltip-col + .conf-tooltip-col {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.conf-tooltip-row.top {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.upscale-limit-note {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--accent);
+  margin-top: 4px;
+}
+.option-card.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ===== AI drawer polish ===== */
+
+/* lighter frame: accent only on the active item */
+.ai-summary.ai-drawer {
+  border-left: 1px solid var(--line-strong);
+  background: var(--bg);
+  padding: 8px 12px;
+}
+
+/* the header button already says "AI" */
+.ai-drawer .ai-summary-title { display: none; }
+.ai-drawer .ai-tabs { margin-left: 0; }
+
+/* one tidy toolbar row; model names never wrap */
+.ai-drawer .ai-toolbar {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.ai-drawer .ai-toolbar .ba-btn { white-space: nowrap; font-size: 11.5px; padding: 3px 9px; }
+.ai-drawer .ai-toolbar-label { display: none; }
+
+/* line by line: no repeated Devanagari, translation first */
+.ai-drawer .ai-explain-reading { display: none; }
+
+.ai-drawer .ai-explain-item {
+  gap: 8px;
+  padding: 9px 8px 9px 6px;
+  border-top: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ai-drawer .ai-explain-item + .ai-explain-item { margin-top: 2px; }
+.ai-drawer .ai-explain-item:hover { background: var(--panel-bg); }
+.ai-drawer .ai-explain-item.active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+
+.ai-drawer .ai-explain-lines {
+  flex: 0 0 auto;
+  min-width: 34px;
+  height: fit-content;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 10.5px;
+  text-align: center;
+}
+.ai-drawer .ai-explain-item.active .ai-explain-lines { background: var(--accent); color: var(--bg); }
+
+.ai-drawer .ai-explain-translation {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.ai-drawer .ai-explain-note {
+  font-size: 11.5px;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+/* summary text a touch more readable */
+.ai-drawer .ai-summary-text { font-size: 13px; line-height: 1.65; }
+.ai-drawer .ai-summary-note,
+.ai-drawer .ai-empty { font-size: 11px; }
+
+/* ===== Aligned columns: header rows match, boxes match ===== */
+.ocr-results-panel { gap: 0; }
+
+.ocr-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ocr-col .ocr-results { flex: 1; min-height: 0; }
+
+/* same height for both header rows */
+.ocr-results-header,
+.ai-drawer .ai-summary-head {
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+}
+
+/* the drawer itself has no frame: header row + framed box, like the left column */
+.ai-summary.ai-drawer {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 10px;
+  margin-left: 12px;
+}
+.ai-summary.ai-drawer.collapsed { margin-left: 0; }
+.ai-drawer > :not(.ai-resize-handle) { min-width: var(--ai-w); }
+
+.ai-drawer-box {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+}
+
+.ai-drawer .ai-pane { padding: 6px 8px; }
+
+/* model picker + regenerate: footer at the bottom of the box */
+.ai-drawer .ai-toolbar {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 8px 10px;
+  border-bottom: none;
+  border-top: 1px solid var(--line);
+  background: var(--panel-bg);
+}
+
+/* resize grip sits on the box edge, below the header row */
+.ai-drawer .ai-resize-handle { top: 44px; }
+
+/* ===== Collapsible documents sidebar ===== */
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.sidebar-toggle:hover { background: var(--panel-bg); color: var(--ink); }
+.sidebar-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+
+/* collapsed: only the toggle button stays visible */
+.workspace.sidebar-collapsed .sidebar {
+  padding: 12px 0;
+  align-items: center;
+  overflow: hidden;
+}
+.workspace.sidebar-collapsed .sidebar > :not(.sidebar-head),
+.workspace.sidebar-collapsed .sidebar-heading { display: none; }
+.workspace.sidebar-collapsed .sidebar-toggle svg { transform: scaleX(-1); }
+.workspace.sidebar-collapsed #resize-handle { pointer-events: none; cursor: default; }
+
+/* ===== AI header: clear separation ===== */
+
+/* the AI button only shows while the drawer is closed (✕ closes it) */
+.ai-drawer-btn.active { display: none; }
+
+/* drawer label */
+.ai-drawer .ai-summary-head {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.ai-drawer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.ai-drawer-label svg { width: 14px; height: 14px; }
+
+/* Summary / Line by line as a segmented switch, like Original / Edited */
+.ai-drawer .ai-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0;
+  padding: 2px;
+  background: var(--line);
+  border-radius: 7px;
+}
+.ai-drawer .ai-tab {
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: none;
+  white-space: nowrap;
+}
+.ai-drawer .ai-tab:hover { background: none; color: var(--ink); }
+.ai-drawer .ai-tab.active {
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* close button pushed to the far right */
+.ai-drawer .ai-summary-close { margin-left: auto; }
+
+/* ===== Line by line: clearer, more scholarly reading layout ===== */
+/* ===== Line by line: clean reading layout ===== */
+.ai-drawer .ai-explain-list { gap: 0; }
+
+.ai-drawer .ai-explain-item {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  column-gap: 10px;
+  align-items: baseline;
+  padding: 12px 10px 12px 8px;
+  margin: 0;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.ai-drawer .ai-explain-item + .ai-explain-item { margin-top: 0; }
+.ai-drawer .ai-explain-item:last-child { border-bottom: none; }
+.ai-drawer .ai-explain-item:hover { background: var(--panel-bg); }
+.ai-drawer .ai-explain-item.active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+
+/* line reference */
+.ai-drawer .ai-explain-lines {
+  padding: 0;
+  min-width: 0;
+  background: none;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ai-drawer .ai-explain-item.active .ai-explain-lines { background: none; color: var(--accent); }
+
+.ai-drawer .ai-explain-body { gap: 3px; }
+
+/* translation: main text */
+.ai-drawer .ai-explain-translation {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+/* romanized + note: one quiet line each, directly under the translation */
+.ai-drawer .ai-explain-roman,
+.ai-drawer .ai-explain-note {
+  position: static;
+  padding: 0;
+  border: none;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #6B6B6B;
+}
+.ai-drawer .ai-explain-note::before { display: none; }
+
+/* summary tab */
+.ai-drawer .ai-summary-text {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.7;
+  padding: 6px 4px;
+}
+.ai-drawer .ai-summary-note,
+.ai-drawer .ai-empty {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 8px 4px 2px;
+}
+
+/* stale warning: a real banner at the top of the drawer */
+.ai-drawer .ai-summary-note.is-stale {
+  order: -1;
+  margin: 4px 2px 8px;
+  padding: 9px 12px;
+  background: #FEF3E2;
+  border: 1px solid #F5C168;
+  border-radius: 8px;
+  color: #92611A;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+

@@ -33,10 +33,122 @@ import pickle
 import regex as re_regex  # rename to avoid clashing with stdlib `re` already imported above
 from .config import * 
 from .utils.trie import load_trie, TrieNode
+import requests
+from paddleocr import TextDetection   # imported only when Paddle is used
+from .prompts import SUMMARY_PROMPT, EXPLAIN_PROMPT
 
 
 ### path defined in the .env file
 KRAKEN_MODEL_PATH =  os.environ.get('KRAKEN_MODEL_PATH')
+QWEN_API_KEY = os.environ.get('QWEN_API_KEY')
+# qwen
+QWEN_BASE_URL = (os.environ.get('QWEN_BASE_URL') or '').rstrip('/')
+if QWEN_BASE_URL.endswith('/chat/completions'):
+    QWEN_BASE_URL = QWEN_BASE_URL[: -len('/chat/completions')]
+
+QWEN_MODEL = os.environ.get('QWEN_MODEL', 'Qwen/Qwen3.8-27B')
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+
+GPT_OSS_BASE_URL = (os.environ.get('GPT_OSS_BASE_URL') or 'https://api.ai.nws.netways.de/v1').rstrip('/')
+GPT_OSS_MODEL = os.environ.get('GPT_OSS_MODEL', 'openai/gpt-oss-20b')
+
+# every provider speaks the OpenAI /chat/completions format
+SUMMARY_PROVIDERS = {
+    'qwen': {
+        'label': 'Qwen',
+        'api_key': QWEN_API_KEY,
+        'base_url': QWEN_BASE_URL,
+        'model': QWEN_MODEL,
+        'extra': {'chat_template_kwargs': {'enable_thinking': False}},  # vLLM only
+        'suffix': '\n/no_think',
+    },
+    'gpt_oss': {
+        'label': 'GPT-OSS',
+        'api_key': QWEN_API_KEY,          # same key as Qwen
+        'base_url': GPT_OSS_BASE_URL,
+        'model': GPT_OSS_MODEL,
+        'extra': {'reasoning_effort': 'low'},
+        'suffix': '',
+    },
+    'gemini': {
+        'label': 'Gemini',
+        'api_key': GEMINI_API_KEY,
+        'base_url': 'https://generativelanguage.googleapis.com/v1beta/openai',
+        'model': GEMINI_MODEL,
+        'extra': {},
+        'suffix': '',
+        'json_mode': True,
+    },
+}
+
+#################################################
+
+def call_llm(provider, prompt, max_tokens, timeout=120):
+    """Send one prompt to an OpenAI-compatible provider. Returns (text, finish_reason)."""
+    resp = requests.post(
+        f"{provider['base_url']}/chat/completions",
+        headers={'Authorization': f"Bearer {provider['api_key']}", 'Content-Type': 'application/json'},
+        json={
+            'model': provider['model'],
+            'messages': [{'role': 'user', 'content': prompt + provider['suffix']}],
+            'temperature': 0.2,
+            'max_tokens': max_tokens,
+            **provider['extra'],
+        },
+        timeout=timeout,
+    )
+    resp.raise_for_status()
+    choice = resp.json()['choices'][0]
+    content = choice['message'].get('content') or ''
+    content = re.sub(r'<think>.*?(</think>|$)', '', content, flags=re.S).strip()
+    return content, choice.get('finish_reason')
+
+
+def parse_json_reply(content):
+    """Models sometimes wrap JSON in ```json fences or add a sentence; take the outer {...}."""
+    start, end = content.find('{'), content.rfind('}')
+    if start == -1 or end <= start:
+        raise ValueError('no JSON object found')
+    return json.loads(content[start:end + 1])
+
+
+
+
+
+def available_summary_providers():
+    return [{'id': k, 'label': v['label']}
+            for k, v in SUMMARY_PROVIDERS.items() if v['api_key'] and v['base_url']]
+
+### PaddleOCR (text box detection)
+PADDLE_DET_MODEL = os.environ.get('PADDLE_DET_MODEL', 'PP-OCRv5_server_det')
+PADDLE_MIN_SCORE = 0.5   # ignore weak detections
+
+
+@lru_cache(maxsize=1)
+def load_paddle_detector():
+    return TextDetection(model_name=PADDLE_DET_MODEL)
+
+
+def segment_with_paddle(pil_image):
+    """Plain PaddleOCR text detection: one editable box per detected text region."""
+    detector = load_paddle_detector()
+    img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)   # Paddle expects BGR
+    result = detector.predict(img)
+
+    lines = []
+    for res in result:
+        polys = res['dt_polys']
+        scores = res.get('dt_scores', [1.0] * len(polys))
+        for poly, score in zip(polys, scores):
+            if score < PADDLE_MIN_SCORE or len(poly) < 3:
+                continue
+            lines.append({
+                'polygon': [[float(p[0]), float(p[1])] for p in poly],
+                'baseline': [],          # Paddle gives boxes only, no baselines
+            })
+    return lines
 
 
 ### user login and logout
@@ -142,12 +254,15 @@ def upload_image(request, pk = None):
 
     if selected_doc and selected_doc.ocr_predictions:
         for pred in selected_doc.ocr_predictions:
+            pred['char_conf_json'] = json.dumps(pred.get('char_conf', []))
             if 'matched_words_json' not in pred:
                 pred['matched_words_json'] = json.dumps(
                     pred.get('matched_words', []), ensure_ascii=False
                 )
-    return render(request, 'htr/main_page.html', {'form': form, 'documents': documents, 'selected_doc': selected_doc}) # page 1  = upload page  # 
-
+    return render(request, 'htr/main_page.html', {
+        'form': form, 'documents': documents, 'selected_doc': selected_doc,
+        'summary_providers': available_summary_providers(),
+    })
 
     
 ## delete image
@@ -298,15 +413,25 @@ def run_segmentation(request, pk):
         source_field = image.processed if image.processed else image.locked_image
         source_field.open()
         pil_image = Image.open(io.BytesIO(source_field.read())).convert('RGB')
-        model = vgsl.TorchVGSLModel.load_model(KRAKEN_MODEL_PATH)
-        result = blla.segment(pil_image, model=model)
 
-        lines = []
-        for line in result.lines:
-            lines.append({
-                'polygon': line.boundary,
-                'baseline': line.baseline,
-            })
+
+        engine = request.POST.get('engine', 'kraken')
+
+        if engine == 'paddle':
+            try:
+                lines = segment_with_paddle(pil_image)
+                for line in lines:
+                    line['source'] = 'paddle'
+            except ImportError:
+                return JsonResponse({'success': False, 'error': 'PaddleOCR is not installed on the server.'})
+            except Exception as e:
+                import traceback; traceback.print_exc()   # full error still printed in the terminal
+                return JsonResponse({'success': False, 'error': f'PaddleOCR failed: {e}'})
+        else:
+            model = vgsl.TorchVGSLModel.load_model(KRAKEN_MODEL_PATH)
+            result = blla.segment(pil_image, model=model)
+            lines = [{'polygon': line.boundary, 'baseline': line.baseline, 'source': 'kraken'}
+                     for line in result.lines]
 
         
         image.line_coordinates = lines
@@ -408,11 +533,11 @@ def load_ocr_model():
     model.to(device).eval()
     return model, tokenizer, processor, device
 
-
+import re
+DOT_REPLACEMENT = "\u2219" 
 def clean_ocr_text(text):
-    import re
-    return re.sub(r"[\u00AD\u200B\u200C\u200D]", "", text)
-
+    text = re.sub(r"[\u00AD\u200B\u200C\u200D]", "", text)
+    return text.replace(".", DOT_REPLACEMENT)
 
 
 def predict_line_with_confidence(pil_crop, topk=3):
@@ -447,7 +572,7 @@ def predict_line_with_confidence(pil_crop, topk=3):
         tk_idx = tk_idx.tolist()
         tk_vals = tk_vals.tolist()
 
-        alt_tokens = [tokenizer.decode([i], skip_special_tokens=True) for i in tk_idx]
+        alt_tokens = [clean_ocr_text(tokenizer.decode([i], skip_special_tokens=True)) for i in tk_idx]
         alt_probs  = tk_vals
 
         rows.append({
@@ -459,7 +584,30 @@ def predict_line_with_confidence(pil_crop, topk=3):
 
     df_tok = pd.DataFrame(rows)
     highlighted_html = highlight_tokens_with_tooltips(decoded_text, df_tok)
-    return decoded_text, highlighted_html
+    line_conf = float(np.mean([r["confidence"] for r in rows])) if rows else 0.0
+
+    # which characters of the final text each token produced, with its confidence
+    gen_ids = seq[1:].tolist()
+    char_conf = []
+    prev_len = 0
+    pending = 1.0
+    pending_alts = None
+    for k, r in enumerate(rows):
+        if r["confidence"] <= pending:
+            pending = r["confidence"]
+            pending_alts = [
+                r["alt_tokens"].split("|"),
+                [round(float(p), 4) for p in r["alt_probs"].split("|")],
+            ]
+        prefix = clean_ocr_text(tokenizer.decode(gen_ids[:k + 1], skip_special_tokens=True)).rstrip("\ufffd")
+        cur_len = len(prefix)
+        if cur_len > prev_len:
+            char_conf.append([prev_len, cur_len, round(pending, 4), pending_alts])
+            prev_len = cur_len
+            pending = 1.0
+            pending_alts = None
+
+    return decoded_text, highlighted_html, line_conf, char_conf
 
 
 
@@ -532,14 +680,17 @@ def run_ocr(request, pk):
             )
             crop = seg_img.crop(crop_box)
 
-            text, html = predict_line_with_confidence(crop)
+            text, html, line_conf, char_conf = predict_line_with_confidence(crop)
             matched_words = get_matched_words(trie, text, min_len=TRIE_MIN_LEN)
             print(f"Line: {text[:30]}... → matches: {matched_words}")
 
-            predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'matched_words': matched_words, 'matched_words_json': json.dumps(matched_words, ensure_ascii=False), })
+            predictions.append({'line_index': original_idx, 'text': text, 'html': html, 'confidence': round(line_conf, 4), 'char_conf': char_conf, 'matched_words': matched_words, 'matched_words_json': json.dumps(matched_words, ensure_ascii=False), })
             
         image.ocr_predictions = predictions
         image.ocr_stale = False
+        image.ai_summary = ''
+        image.ai_explanation = {}
+        image.ai_outputs = {}
         image.save()
 
         return JsonResponse({'success': True, 'predictions': predictions})
@@ -626,15 +777,89 @@ def edit_ocr(request, pk):
         predictions = image.ocr_predictions or []
         updated_map = {p['line_index']: p['text'] for p in updated}
 
+        changed = False
         for pred in predictions:
             if pred['line_index'] in updated_map:
-                pred['text'] = updated_map[pred['line_index']]
+                new_text = updated_map[pred['line_index']]
+                if new_text != pred.get('text', ''):
+                    changed = True
+                if 'original_text' not in pred:
+                    pred['original_text'] = pred.get('text', '')
+                pred['text'] = new_text
 
         image.ocr_predictions = predictions
-        image.save()
 
-        return JsonResponse({'success': True})
+        # AI results were made from the old text → mark them as outdated
+        if changed and image.ai_outputs:
+            for out in image.ai_outputs.values():
+                if out.get('summary'):
+                    out['summary_stale'] = True
+                if out.get('explanation'):
+                    out['explanation_stale'] = True
+
+        image.save()
+        return JsonResponse({'success': True, 'changed': changed})
     return JsonResponse({'success': False})
+
+
+@login_required
+def summarize_transcription(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'success': False})
+
+    image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
+    provider_id = request.POST.get('provider', 'qwen')
+    provider = SUMMARY_PROVIDERS.get(provider_id)
+    if not provider or not provider['api_key'] or not provider['base_url']:
+        return JsonResponse({'success': False, 'error': f'{provider_id} is not configured on the server.'})
+
+    lines = [p.get('text', '').strip() for p in (image.ocr_predictions or [])]
+    lines = [l for l in lines if l]
+    if not lines:
+        return JsonResponse({'success': False, 'error': 'There is no transcription to summarize yet.'})
+    text = "\n".join(lines)[:6000]
+
+    try:
+        resp = requests.post(
+            f"{provider['base_url']}/chat/completions",
+            headers={'Authorization': f"Bearer {provider['api_key']}", 'Content-Type': 'application/json'},
+            json={
+                'model': provider['model'],
+                'messages': [{'role': 'user', 'content': SUMMARY_PROMPT.format(text=text) + provider['suffix']}],
+                'temperature': 0.3,
+                'max_tokens': 6000,   # Gemini 2.5+ counts its thinking tokens here too
+                **provider['extra'],
+            },
+            timeout=90,
+        )
+        resp.raise_for_status()
+        choice = resp.json()['choices'][0]
+        content = choice['message'].get('content') or ''
+        finish_reason = choice.get('finish_reason')
+    except requests.HTTPError as e:
+        detail = e.response.text[:300] if e.response is not None else ''
+        return JsonResponse({'success': False, 'error': f"{provider['label']} error: {e} {detail}"})
+    except requests.RequestException as e:
+        return JsonResponse({'success': False, 'error': f"{provider['label']} service error: {e}"})
+    except (KeyError, IndexError, ValueError):
+        return JsonResponse({'success': False, 'error': f"Unexpected answer from {provider['label']}."})
+
+    summary = re.sub(r'<think>.*?(</think>|$)', '', content, flags=re.S).strip()
+    summary = re.sub(r'\*\*(.+?)\*\*', r'\1', summary)          # drop **bold** markers
+    summary = re.sub(r'\s+(?=\d\.\s)', '\n', summary)            # put "2. " and "3. " on new lines
+    if not summary:
+        msg = 'The model ran out of tokens before writing a summary.' if finish_reason == 'length' \
+              else 'The model returned an empty summary.'
+        return JsonResponse({'success': False, 'error': msg})
+
+    outputs = image.ai_outputs or {}
+    entry = outputs.setdefault(provider_id, {})
+    entry['summary'] = summary
+    entry['summary_stale'] = False
+    image.ai_outputs = outputs
+    image.save()
+    return JsonResponse({'success': True, 'summary': summary, 'provider': provider_id})
 
 
 @login_required
@@ -649,3 +874,74 @@ def back_to_segmentation(request, pk):
 
 
 
+@login_required
+def explain_transcription(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'success': False})
+
+    image = get_object_or_404(UploadedImage, pk=pk, user=request.user)
+
+    provider_id = request.POST.get('provider', 'qwen')
+    provider = SUMMARY_PROVIDERS.get(provider_id)
+    if not provider or not provider['api_key'] or not provider['base_url']:
+        return JsonResponse({'success': False, 'error': f'{provider_id} is not configured on the server.'})
+
+    preds = image.ocr_predictions or []
+    if not any(p.get('text', '').strip() for p in preds):
+        return JsonResponse({'success': False, 'error': 'There is no transcription to explain yet.'})
+
+    # same numbering as the rows on screen (1, 2, 3, ...)
+    numbered = "\n".join(f"L{i}: {p.get('text', '').strip()}" for i, p in enumerate(preds, 1))
+
+    try:
+        content, finish_reason = call_llm(provider, EXPLAIN_PROMPT.format(text=numbered[:8000]), max_tokens=6000)
+    except requests.HTTPError as e:
+        detail = e.response.text[:300] if e.response is not None else ''
+        return JsonResponse({'success': False, 'error': f"{provider['label']} error: {e} {detail}"})
+    except requests.RequestException as e:
+        return JsonResponse({'success': False, 'error': f"{provider['label']} service error: {e}"})
+    except (KeyError, IndexError, ValueError):
+        return JsonResponse({'success': False, 'error': f"Unexpected answer from {provider['label']}."})
+
+    try:
+        raw_segments = parse_json_reply(content)['segments']
+    except (ValueError, KeyError, TypeError):
+        msg = ('The model ran out of tokens before finishing.' if finish_reason == 'length'
+               else 'The model did not return a readable answer. Please try again.')
+        return JsonResponse({'success': False, 'error': msg})
+
+    segments = []
+    used = set()                                   # each line belongs to one segment only
+    for s in raw_segments:
+        nums = []
+        for x in s.get('lines', []):
+            try:
+                n = int(x)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= n <= len(preds) and n not in used:
+                nums.append(n)
+        if not nums:
+            continue
+        used.update(nums)
+
+        segments.append({
+            'lines': nums,
+            'line_indices': [preds[n - 1]['line_index'] for n in nums],
+            'reading': ''.join(preds[n - 1].get('text', '').strip() for n in nums),
+            'translation': str(s.get('translation', '')).strip(),
+            'note': str(s.get('note', '')).strip(),
+        })
+
+
+    if not segments:
+        return JsonResponse({'success': False, 'error': 'The model returned an empty explanation.'})
+
+    outputs = image.ai_outputs or {}
+    entry = outputs.setdefault(provider_id, {})
+    entry['explanation'] = {'segments': segments}
+    entry['explanation_stale'] = False
+    image.ai_outputs = outputs
+    image.save()
+
+    return JsonResponse({'success': True, 'segments': segments, 'provider': provider_id})
